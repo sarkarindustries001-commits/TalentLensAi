@@ -1,0 +1,3146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TalentLens AI — Enterprise Resume Screening & Candidate Ranking</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    body {
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+
+    input[type="range"].rubric-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      border-radius: 9999px;
+      background: #e2e8f0;
+      outline: none;
+    }
+    input[type="range"].rubric-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #4f46e5;
+      border: 2px solid #ffffff;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+      cursor: pointer;
+      transition: transform 0.12s ease, background-color 0.12s ease;
+    }
+    input[type="range"].rubric-slider::-webkit-slider-thumb:hover {
+      background: #4338ca;
+      transform: scale(1.08);
+    }
+    input[type="range"].rubric-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #4f46e5;
+      border: 2px solid #ffffff;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+      cursor: pointer;
+    }
+
+    .tooltip-trigger {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+    .tooltip-trigger .tooltip-box {
+      visibility: hidden;
+      opacity: 0;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      width: 230px;
+      background: #0f172a;
+      color: #f8fafc;
+      font-size: 11.5px;
+      line-height: 1.45;
+      font-weight: 400;
+      padding: 8px 10px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.28);
+      pointer-events: none;
+      transition: opacity 0.16s ease, transform 0.16s ease;
+      z-index: 60;
+      text-align: left;
+    }
+    .tooltip-trigger:hover .tooltip-box,
+    .tooltip-trigger:focus-within .tooltip-box {
+      visibility: visible;
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .drawer-backdrop {
+      transition: opacity 0.22s ease;
+    }
+    .drawer-panel {
+      transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes progressPulse {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+    .progress-animated {
+      background: linear-gradient(90deg, #4f46e5, #818cf8, #4f46e5);
+      background-size: 200% 100%;
+      animation: progressPulse 1.4s linear infinite;
+    }
+
+    .dropzone-active {
+      border-color: #4f46e5 !important;
+      background-color: #eef2ff !important;
+    }
+
+    @media print {
+      body > *:not(#summaryModal) {
+        display: none !important;
+      }
+      #summaryModal {
+        position: static !important;
+        display: block !important;
+        background: #ffffff !important;
+        padding: 0 !important;
+      }
+      #summaryModalCard {
+        max-height: none !important;
+        box-shadow: none !important;
+        border: none !important;
+        overflow: visible !important;
+      }
+      #summaryModalBody {
+        overflow: visible !important;
+        max-height: none !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+  <!-- Top Enterprise Navigation Bar -->
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
+    <div class="max-w-[1460px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center shadow-sm shrink-0">
+          <i data-lucide="scan-search" class="w-5 h-5 text-white"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-slate-900 truncate">TalentLens AI</h1>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+              Enterprise Screening
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 hidden md:block">Universal resume parser, strict rubric scoring &amp; BYOK Custom AI engine</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-2.5 shrink-0">
+        <!-- Custom API (BYOK) Trigger -->
+        <button id="apiConfigBtn" type="button"
+          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 transition shadow-2xs">
+          <span id="engineStatusDot" class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span id="engineStatusLabel" class="hidden sm:inline">Built-In Engine</span>
+          <span class="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-600">Custom API</span>
+          <i data-lucide="key-round" class="w-3.5 h-3.5 text-indigo-500"></i>
+        </button>
+
+        <button id="resetDemoBtn" type="button"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition"
+          title="Clear all candidates and reset workspace">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Reset</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace Layout -->
+  <div class="flex-1 max-w-[1460px] w-full mx-auto px-4 sm:px-6 py-6">
+    <div class="flex flex-col lg:flex-row gap-6 items-start">
+
+      <!-- LEFT SIDEBAR: Job Description Setup + Custom API Quick Card -->
+      <aside class="w-full lg:w-[345px] xl:w-[370px] shrink-0 space-y-4 lg:sticky lg:top-20">
+        <!-- Job Description Card -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2 bg-slate-50/70">
+            <div class="flex items-center gap-2">
+              <i data-lucide="briefcase" class="w-4 h-4 text-indigo-600"></i>
+              <h2 class="text-sm font-semibold text-slate-900">Job Description Setup</h2>
+            </div>
+            <button id="loadSampleJobBtn" type="button"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/70 transition">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              Load Sample Job
+            </button>
+          </div>
+
+          <div class="p-5 space-y-4">
+            <div class="flex items-center justify-between text-xs text-slate-500">
+              <span>Active Role Preset</span>
+              <span id="sampleJobIndicator" class="font-medium text-indigo-600">1 of 3 · B2B Sales</span>
+            </div>
+
+            <!-- Job Title -->
+            <div>
+              <label for="jobTitleInput" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                Job Title
+              </label>
+              <input id="jobTitleInput" type="text"
+                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition"
+                placeholder="e.g. Senior B2B Sales Executive" />
+            </div>
+
+            <!-- Must-Have Requirements & Skills -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label for="jobRequirementsInput" class="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                  Must-Have Requirements &amp; Skills
+                </label>
+                <span class="tooltip-trigger text-slate-400 hover:text-slate-600 cursor-help" tabindex="0">
+                  <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                  <span class="tooltip-box">Write one requirement per line. Every uploaded resume is evaluated strictly against these criteria with verbatim evidence quotes.</span>
+                </span>
+              </div>
+              <textarea id="jobRequirementsInput" rows="6"
+                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-xs sm:text-[13px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition resize-y"
+                placeholder="Enter required years of experience, skills, tools, and education..."></textarea>
+            </div>
+
+            <!-- Weighting Sliders -->
+            <div class="pt-2 border-t border-slate-100">
+              <div class="flex items-center justify-between mb-2.5">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-600">Scoring Rubric Weights</span>
+                <span class="tooltip-trigger text-slate-400 hover:text-slate-600 cursor-help" tabindex="0">
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+                  <span class="tooltip-box">Weights auto-normalize to 100% and re-rank all candidates immediately.</span>
+                </span>
+              </div>
+
+              <div class="h-2 w-full rounded-full overflow-hidden flex bg-slate-100 mb-3.5" aria-label="Weight distribution">
+                <div id="barExp" class="bg-indigo-600 transition-all duration-200" style="width: 40%"></div>
+                <div id="barSkills" class="bg-sky-500 transition-all duration-200" style="width: 45%"></div>
+                <div id="barEdu" class="bg-emerald-500 transition-all duration-200" style="width: 15%"></div>
+              </div>
+
+              <div class="space-y-3">
+                <div>
+                  <div class="flex items-center justify-between text-xs mb-1">
+                    <label for="weightExp" class="font-medium text-slate-700 flex items-center gap-1.5">
+                      <span class="w-2 h-2 rounded-full bg-indigo-600"></span>
+                      Experience
+                    </label>
+                    <span id="weightExpVal" class="font-semibold text-slate-900 tabular-nums">40%</span>
+                  </div>
+                  <input id="weightExp" type="range" min="0" max="100" value="40" class="rubric-slider w-full" />
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between text-xs mb-1">
+                    <label for="weightSkills" class="font-medium text-slate-700 flex items-center gap-1.5">
+                      <span class="w-2 h-2 rounded-full bg-sky-500"></span>
+                      Skills Match
+                    </label>
+                    <span id="weightSkillsVal" class="font-semibold text-slate-900 tabular-nums">45%</span>
+                  </div>
+                  <input id="weightSkills" type="range" min="0" max="100" value="45" class="rubric-slider w-full" />
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between text-xs mb-1">
+                    <label for="weightEdu" class="font-medium text-slate-700 flex items-center gap-1.5">
+                      <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      Education
+                    </label>
+                    <span id="weightEduVal" class="font-semibold text-slate-900 tabular-nums">15%</span>
+                  </div>
+                  <input id="weightEdu" type="range" min="0" max="100" value="15" class="rubric-slider w-full" />
+                </div>
+              </div>
+            </div>
+
+            <button id="reEvaluateBtn" type="button" disabled
+              class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed transition shadow-sm">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              Re-Score Loaded Candidates
+            </button>
+          </div>
+        </div>
+
+        <!-- Sidebar Custom API (BYOK) Quick Panel -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-xs font-bold text-slate-900">AI Screening Engine</h3>
+                <p id="sidebarEngineDesc" class="text-[11px] text-slate-500">Built-In Strict Rubric (Free)</p>
+              </div>
+            </div>
+            <button id="sidebarApiBtn" type="button"
+              class="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-900 text-white hover:bg-slate-800 transition shrink-0">
+              Configure API
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2.5 leading-relaxed">
+            Works out of the box with zero API cost. Connect your own <span class="font-medium text-slate-700">Gemini, OpenAI, Claude,</span> or <span class="font-medium text-slate-700">Custom LLM</span> key anytime.
+          </p>
+        </div>
+      </aside>
+
+      <!-- RIGHT MAIN AREA: Universal Upload + KPIs + Leaderboard -->
+      <main class="flex-1 min-w-0 space-y-5 w-full">
+
+        <!-- TOP MAIN AREA: Universal Resume Intake (PDF / DOCX / TXT / Paste Text) -->
+        <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 class="text-base font-semibold text-slate-900">Resume Intake &amp; Batch Screening</h2>
+              <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Upload any <span class="font-medium text-slate-700">.PDF, .DOCX, or .TXT</span> resumes—or paste raw resume text directly.</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0 flex-wrap">
+              <button id="togglePasteBtn" type="button"
+                class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition">
+                <i data-lucide="clipboard-paste" class="w-4 h-4 text-indigo-600"></i>
+                Paste Resume Text
+              </button>
+              <button id="loadSampleResumesBtn" type="button"
+                class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 shadow-sm shadow-indigo-600/20 transition">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                Try with 5 Sample Resumes
+              </button>
+            </div>
+          </div>
+
+          <!-- Drag-and-Drop Zone -->
+          <div id="dropZone" role="button" tabindex="0" aria-label="Upload PDF, DOCX, or TXT resumes"
+            class="relative rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/70 hover:bg-indigo-50/30 hover:border-indigo-400 transition px-6 py-6 text-center cursor-pointer">
+            <input id="fileInput" type="file" multiple accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" class="sr-only" />
+            <div class="mx-auto w-11 h-11 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center mb-2.5">
+              <i data-lucide="upload-cloud" class="w-5 h-5 text-indigo-600"></i>
+            </div>
+            <p class="text-sm font-medium text-slate-800">
+              Drag &amp; drop any resumes here, or <span class="text-indigo-600 font-semibold underline decoration-indigo-300 underline-offset-2">browse files</span>
+            </p>
+            <p class="text-xs text-slate-500 mt-1">
+              Batch supports <span class="font-semibold text-slate-700">.PDF</span>, <span class="font-semibold text-slate-700">.DOCX</span>, and <span class="font-semibold text-slate-700">.TXT</span> · Auto-extracts name, contact, years of experience &amp; verified skills
+            </p>
+          </div>
+
+          <!-- Collapsible Direct Paste Resume Box -->
+          <div id="pasteResumePanel" class="hidden mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <label for="pasteResumeText" class="text-xs font-semibold text-slate-800">Paste Any Candidate Resume Text</label>
+              <button id="closePasteBtn" type="button" class="text-xs text-slate-400 hover:text-slate-700">Close</button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input id="pasteCandidateName" type="text" placeholder="Candidate Name (optional — auto-detected)"
+                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+              <input id="pasteCandidateRole" type="text" placeholder="Current Title / Role (optional — auto-detected)"
+                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+            </div>
+            <textarea id="pasteResumeText" rows="5" placeholder="Paste full resume text (summary, work experience, skills, education)..."
+              class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none resize-y"></textarea>
+            <div class="flex justify-end">
+              <button id="screenPastedBtn" type="button"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition shadow-xs">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                Screen Pasted Resume
+              </button>
+            </div>
+          </div>
+
+          <!-- Animated Progress State -->
+          <div id="processingState" class="hidden mt-4 rounded-xl border border-indigo-200 bg-indigo-50/70 p-4">
+            <div class="flex items-center justify-between gap-3 mb-2">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="relative flex h-3 w-3 shrink-0">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-indigo-600"></span>
+                </span>
+                <p id="processingTitle" class="text-sm font-semibold text-indigo-950 truncate">
+                  Analyzing candidate profiles against rubric...
+                </p>
+              </div>
+              <span id="processingPercent" class="text-xs font-bold text-indigo-700 tabular-nums shrink-0">0%</span>
+            </div>
+            <div class="w-full h-2 bg-indigo-100 rounded-full overflow-hidden">
+              <div id="processingBar" class="h-full progress-animated rounded-full transition-all duration-200" style="width: 12%"></div>
+            </div>
+            <p id="processingSubtext" class="text-xs text-indigo-700/80 mt-2">
+              Parsing document text, verifying skills, and generating tailored interview questions...
+            </p>
+          </div>
+        </section>
+
+        <!-- KPI Summary Strip -->
+        <section id="kpiStrip" class="hidden grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-slate-500">Screened Candidates</span>
+              <i data-lucide="file-check-2" class="w-4 h-4 text-slate-400"></i>
+            </div>
+            <p id="kpiTotal" class="text-2xl font-bold text-slate-900 mt-1.5 tabular-nums">0</p>
+          </div>
+          <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-slate-500">Strong Matches (80%+)</span>
+              <i data-lucide="award" class="w-4 h-4 text-emerald-500"></i>
+            </div>
+            <p id="kpiStrong" class="text-2xl font-bold text-emerald-600 mt-1.5 tabular-nums">0</p>
+          </div>
+          <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-slate-500">Average Match Score</span>
+              <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-500"></i>
+            </div>
+            <p id="kpiAvg" class="text-2xl font-bold text-slate-900 mt-1.5 tabular-nums">0%</p>
+          </div>
+          <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-slate-500">Shortlisted</span>
+              <i data-lucide="bookmark-check" class="w-4 h-4 text-indigo-600"></i>
+            </div>
+            <p id="kpiShortlisted" class="text-2xl font-bold text-indigo-600 mt-1.5 tabular-nums">0</p>
+          </div>
+        </section>
+
+        <!-- Candidate Leaderboard & Scorecard Table -->
+        <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <h2 class="text-base font-semibold text-slate-900">Candidate Leaderboard</h2>
+              <span id="leaderboardCountBadge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 tabular-nums">
+                0 candidates
+              </span>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200/80" role="group" aria-label="Filter candidates">
+                <button type="button" data-filter="all" class="filter-btn px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-slate-900 shadow-xs transition">
+                  All
+                </button>
+                <button type="button" data-filter="strong" class="filter-btn px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition">
+                  80%+
+                </button>
+                <button type="button" data-filter="shortlisted" class="filter-btn px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition">
+                  Shortlisted (<span id="shortlistTabCount">0</span>)
+                </button>
+              </div>
+
+              <div class="relative">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                <input id="candidateSearchInput" type="text" placeholder="Search name or skill..."
+                  class="pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none w-44 sm:w-48 transition" />
+              </div>
+
+              <!-- One-Page Summary Report -->
+              <button id="exportSummaryBtn" type="button" disabled
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-45 disabled:cursor-not-allowed transition">
+                <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                One-Page Summary
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="emptyState" class="px-6 py-16 text-center">
+            <div class="mx-auto w-14 h-14 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center mb-4">
+              <i data-lucide="clipboard-list" class="w-7 h-7 text-slate-400"></i>
+            </div>
+            <h3 class="text-sm font-semibold text-slate-900">Ready to screen any resume</h3>
+            <p class="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1.5 leading-relaxed">
+              Drop in real <span class="font-medium text-slate-700">.PDF, .DOCX, or .TXT</span> resumes, paste resume text, or run our instant 5-candidate demo to see strict evidence-backed ranking and interview guides.
+            </p>
+            <button id="emptyStateSampleBtn" type="button"
+              class="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition">
+              <i data-lucide="play" class="w-3.5 h-3.5"></i>
+              Try with 5 Sample Resumes
+            </button>
+          </div>
+
+          <!-- Filtered Empty State -->
+          <div id="noFilterMatchState" class="hidden px-6 py-12 text-center">
+            <p class="text-sm font-medium text-slate-700">No candidates match your current filter.</p>
+            <button id="clearFiltersBtn" type="button" class="mt-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800 underline underline-offset-2">
+              Clear filters
+            </button>
+          </div>
+
+          <!-- Scorecard Table -->
+          <div id="tableWrapper" class="hidden overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <th class="py-3 pl-5 pr-3 w-14">Rank</th>
+                  <th class="py-3 px-3 min-w-[190px]">Candidate</th>
+                  <th class="py-3 px-3 w-36">
+                    <span class="inline-flex items-center gap-1">
+                      Match Score
+                      <span class="tooltip-trigger text-slate-400 cursor-help" tabindex="0">
+                        <i data-lucide="info" class="w-3 h-3"></i>
+                        <span class="tooltip-box normal-case tracking-normal">Green: 80–100% (Strong) · Amber: 60–79% (Moderate) · Red: &lt;60% (Weak). Weighted by your sidebar sliders.</span>
+                      </span>
+                    </span>
+                  </th>
+                  <th class="py-3 px-3 min-w-[220px]">Top 2 Verified Strengths</th>
+                  <th class="py-3 px-3 min-w-[205px]">Missing Skills / Red Flags</th>
+                  <th class="py-3 pl-3 pr-5 text-right min-w-[235px]">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboardBody" class="divide-y divide-slate-100 text-sm"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Candidate Deep-Dive Slide-Over Drawer -->
+  <div id="drawerContainer" class="fixed inset-0 z-50 hidden" aria-modal="true" role="dialog" aria-labelledby="drawerCandidateName">
+    <div id="drawerBackdrop" class="drawer-backdrop fixed inset-0 bg-slate-900/45 backdrop-blur-[2px] opacity-0"></div>
+    <div class="fixed inset-y-0 right-0 flex max-w-full pl-6 sm:pl-12">
+      <div id="drawerPanel" class="drawer-panel w-screen max-w-2xl bg-white shadow-2xl border-l border-slate-200 flex flex-col translate-x-full">
+        <!-- Drawer Header -->
+        <div class="px-6 py-5 border-b border-slate-200 bg-slate-50/80 flex items-start justify-between gap-4">
+          <div class="flex items-start gap-3.5 min-w-0">
+            <div id="drawerAvatar" class="w-12 h-12 rounded-xl bg-indigo-600 text-white font-bold text-base flex items-center justify-center shrink-0 shadow-sm">
+              ER
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2.5 flex-wrap">
+                <h3 id="drawerCandidateName" class="text-lg font-bold text-slate-900 truncate">Candidate Name</h3>
+                <span id="drawerScoreBadge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold">92% Match</span>
+              </div>
+              <p id="drawerCandidateMeta" class="text-xs sm:text-sm text-slate-500 mt-0.5 truncate">Role · Location</p>
+              <p id="drawerContactMeta" class="text-xs text-slate-500 mt-0.5 truncate"></p>
+              <p id="drawerEngineTag" class="text-[11px] text-indigo-600 font-medium mt-1">Evaluated strictly against active rubric</p>
+            </div>
+          </div>
+          <button id="closeDrawerBtn" type="button" aria-label="Close breakdown drawer"
+            class="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Drawer Scrollable Body -->
+        <div id="drawerBody" class="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+          <!-- Sub-score Cards -->
+          <div class="grid grid-cols-3 gap-3">
+            <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+              <div class="flex items-center justify-between text-xs text-slate-500">
+                <span>Experience</span>
+                <span id="drawerWeightExp" class="font-medium text-slate-400">40% wt</span>
+              </div>
+              <p id="drawerSubExp" class="text-xl font-bold text-slate-900 mt-1 tabular-nums">0%</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+              <div class="flex items-center justify-between text-xs text-slate-500">
+                <span>Skills Match</span>
+                <span id="drawerWeightSkills" class="font-medium text-slate-400">45% wt</span>
+              </div>
+              <p id="drawerSubSkills" class="text-xl font-bold text-slate-900 mt-1 tabular-nums">0%</p>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+              <div class="flex items-center justify-between text-xs text-slate-500">
+                <span>Education</span>
+                <span id="drawerWeightEdu" class="font-medium text-slate-400">15% wt</span>
+              </div>
+              <p id="drawerSubEdu" class="text-xl font-bold text-slate-900 mt-1 tabular-nums">0%</p>
+            </div>
+          </div>
+
+          <!-- Executive Summary -->
+          <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-indigo-800 mb-1.5 flex items-center gap-1.5">
+              <i data-lucide="shield-check" class="w-4 h-4"></i>
+              Evidence-Backed Assessment Summary
+            </h4>
+            <p id="drawerSummary" class="text-sm text-slate-700 leading-relaxed"></p>
+          </div>
+
+          <!-- Verbatim Evidence Reasoning -->
+          <div>
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-600 mb-3 flex items-center gap-1.5">
+              <i data-lucide="quote" class="w-4 h-4 text-indigo-600"></i>
+              Rubric Breakdown &amp; Quoted Resume Evidence
+            </h4>
+            <div id="drawerEvidenceList" class="space-y-3"></div>
+          </div>
+
+          <!-- 3 Tailored Behavioral Interview Questions -->
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-3">
+              <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                <i data-lucide="message-square-text" class="w-4 h-4 text-indigo-600"></i>
+                3 Tailored Behavioral Interview Questions
+              </h4>
+              <span class="text-[11px] text-slate-400">Targeted to gaps &amp; claim verification</span>
+            </div>
+            <div id="drawerQuestionsList" class="space-y-3"></div>
+          </div>
+
+          <!-- Recruiter Private Notes -->
+          <div>
+            <label for="drawerNotesInput" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">
+              Recruiter Notes (Saved in Browser)
+            </label>
+            <textarea id="drawerNotesInput" rows="3" placeholder="Add call feedback, salary expectations, notice period, or hiring manager notes..."
+              class="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition resize-y"></textarea>
+          </div>
+
+          <!-- Collapsible Raw Resume Excerpt -->
+          <details class="rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
+            <summary class="px-4 py-3 text-xs font-semibold text-slate-700 cursor-pointer hover:bg-slate-100/80 select-none flex items-center justify-between">
+              <span>Inspect Parsed Source Resume Text (Audit Trail)</span>
+              <span class="text-slate-400 font-normal">Click to expand</span>
+            </summary>
+            <pre id="drawerRawResume" class="px-4 py-3 text-xs text-slate-600 whitespace-pre-wrap font-mono border-t border-slate-200 bg-white max-h-60 overflow-y-auto leading-relaxed"></pre>
+          </details>
+        </div>
+
+        <!-- Drawer Footer -->
+        <div class="px-6 py-4 border-t border-slate-200 bg-white flex flex-wrap items-center justify-between gap-3">
+          <button id="drawerShortlistBtn" type="button"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition">
+            <i data-lucide="bookmark" class="w-4 h-4"></i>
+            <span>Shortlist Candidate</span>
+          </button>
+          <button id="copyGuideBtn" type="button"
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+            Copy Interview Guide
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- One-Page Executive Summary Modal -->
+  <div id="summaryModal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-6 bg-slate-900/55 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="summaryModalTitle">
+    <div id="summaryModalCard" class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="no-print px-5 py-4 border-b border-slate-200 bg-slate-50/90 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 id="summaryModalTitle" class="text-sm sm:text-base font-bold text-slate-900">One-Page Candidate Summary</h3>
+              <span id="summaryScopeBadge" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                All Candidates
+              </span>
+            </div>
+            <p class="text-xs text-slate-500">Clean single-page overview of advantages, weaknesses, evidence, and interview guides</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="copySummaryTextBtn" type="button"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            Copy Summary
+          </button>
+          <button id="printSummaryBtn" type="button"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition">
+            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+            Print / PDF
+          </button>
+          <button id="downloadSummaryHtmlBtn" type="button"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs transition">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            Download Summary (.html)
+          </button>
+          <button id="closeSummaryModalBtn" type="button" aria-label="Close summary modal"
+            class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="summaryModalBody" class="flex-1 overflow-y-auto p-5 sm:p-7 bg-slate-50/40">
+        <div id="summarySheet" class="max-w-4xl mx-auto bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom API (BYOK — Bring Your Own Key) Side Panel Drawer -->
+  <div id="apiDrawerContainer" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-labelledby="apiModalTitle">
+    <div id="apiDrawerBackdrop" class="drawer-backdrop fixed inset-0 bg-slate-900/45 backdrop-blur-[2px] opacity-0"></div>
+    <div class="fixed inset-y-0 right-0 flex max-w-full pl-6 sm:pl-12">
+      <div id="apiDrawerPanel" class="drawer-panel w-screen max-w-md bg-white shadow-2xl border-l border-slate-200 flex flex-col translate-x-full">
+        <div class="px-5 py-4 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+              <i data-lucide="key-round" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 id="apiModalTitle" class="text-sm font-bold text-slate-900">Custom API Settings (BYOK)</h3>
+              <p class="text-[11px] text-slate-500">Use built-in engine free, or plug in your own AI key</p>
+            </div>
+          </div>
+          <button id="closeApiModalBtn" type="button" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-5 space-y-5">
+          <!-- Provider Selection -->
+          <div>
+            <label for="apiProviderSelect" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+              AI Screening Provider
+            </label>
+            <select id="apiProviderSelect"
+              class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none">
+              <option value="builtin">Built-In Strict Rubric Engine (Free · No API Key)</option>
+              <option value="gemini">Google Gemini API (gemini-2.5-flash / pro)</option>
+              <option value="openai">OpenAI API (gpt-4o-mini / gpt-4o)</option>
+              <option value="anthropic">Anthropic Claude API (claude-3-5-sonnet)</option>
+              <option value="custom">Custom OpenAI-Compatible API (Groq, OpenRouter, DeepSeek, etc.)</option>
+            </select>
+          </div>
+
+          <!-- Built-In Info Banner -->
+          <div id="builtinInfoBox" class="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-xs text-emerald-900 leading-relaxed">
+            <p class="font-semibold flex items-center gap-1.5 mb-1">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>
+              Zero-Setup Mode Active
+            </p>
+            <p>All resumes (.PDF, .DOCX, .TXT, or pasted text) are parsed and scored directly in your browser using our deterministic rubric engine—no external API billing or setup required.</p>
+          </div>
+
+          <!-- Custom Provider Fields -->
+          <div id="externalApiFields" class="hidden space-y-4">
+            <div>
+              <label for="apiKeyInput" class="block text-xs font-semibold text-slate-700 mb-1.5">API Key</label>
+              <div class="relative">
+                <input id="apiKeyInput" type="password" placeholder="Paste your provider API key..."
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                <button id="toggleKeyVisBtn" type="button" title="Show or hide key"
+                  class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+                  <i data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-1">Stored locally in your browser only—never sent to any third-party server other than your chosen AI provider.</p>
+            </div>
+
+            <div>
+              <label for="apiModelInput" class="block text-xs font-semibold text-slate-700 mb-1.5">Model ID</label>
+              <input id="apiModelInput" type="text" placeholder="e.g. gemini-2.5-flash"
+                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+            </div>
+
+            <div id="customEndpointGroup" class="hidden">
+              <label for="apiEndpointInput" class="block text-xs font-semibold text-slate-700 mb-1.5">Chat Completions Endpoint URL (HTTPS)</label>
+              <input id="apiEndpointInput" type="url" placeholder="https://api.groq.com/openai/v1/chat/completions"
+                class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+              <p class="text-[11px] text-slate-400 mt-1">Works with Groq, OpenRouter, DeepSeek, Mistral, Together AI, or any CORS-enabled OpenAI-compatible gateway.</p>
+            </div>
+
+            <label class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
+              <div>
+                <span class="block text-xs font-semibold text-slate-800">Remember key in this browser</span>
+                <span class="block text-[11px] text-slate-500">Keeps your Custom API ready after reload</span>
+              </div>
+              <input id="persistKeyCheckbox" type="checkbox" checked class="w-4 h-4 accent-indigo-600 rounded" />
+            </label>
+
+            <!-- Connection Test Area -->
+            <div class="pt-1 space-y-2">
+              <button id="testApiBtn" type="button"
+                class="w-full inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition">
+                <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                Test API Connection
+              </button>
+              <div id="apiTestResult" class="hidden rounded-lg px-3 py-2 text-xs leading-relaxed"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-5 py-4 border-t border-slate-200 bg-white flex items-center justify-between gap-2">
+          <button id="clearApiKeyBtn" type="button" class="px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+            Reset to Built-In
+          </button>
+          <button id="saveApiKeyBtn" type="button" class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs transition">
+            Save API Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-[70] flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      try {
+        if (window.pdfjsLib) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+      } catch (_) {}
+
+      // ============================================================
+      // 1. SAMPLE JOBS & REALISTIC SAMPLE RESUMES
+      // ============================================================
+      const SAMPLE_JOBS = [
+        {
+          id: 'b2b-sales',
+          label: 'B2B Sales',
+          title: 'Senior B2B Sales Executive',
+          requirements: [
+            '5+ years of full-cycle Enterprise B2B SaaS sales experience',
+            'Proven track record exceeding $1M+ annual quota attainment',
+            'Hands-on command of MEDDPICC or Challenger sales methodology',
+            'Proficiency with Salesforce CRM, Gong, and multi-threaded C-suite negotiation',
+            "Bachelor's degree in Business, Economics, Finance, or related field"
+          ].join('\n'),
+          weights: { exp: 40, skills: 45, edu: 15 },
+          sampleResumes: [
+            {
+              name: 'Elena Rostova',
+              role: 'Enterprise Account Executive · CloudScale Systems',
+              location: 'San Francisco, CA',
+              email: 'elena.rostova@example.com',
+              text: `ELENA ROSTOVA
+Enterprise Account Executive | San Francisco, CA | elena.rostova@example.com
+
+SUMMARY
+8 years of full-cycle Enterprise B2B SaaS sales experience closing six-figure multi-year agreements with Fortune 1000 buyers.
+
+EXPERIENCE
+Enterprise Account Executive — CloudScale Systems (2022–Present)
+- Exceeded $1.8M annual quota at 134% attainment in FY2025 ($2.41M net-new ARR closed).
+- Executed multi-threaded C-suite negotiation across CFO, CIO, and VP Engineering stakeholders (average ACV $245K).
+- Applied MEDDPICC qualification rigor and Challenger sales methodology across 40+ active enterprise opportunities.
+- Daily power user of Salesforce CRM forecasting dashboards and Gong deal intelligence reviews.
+
+Senior Mid-Market Account Executive — DataPulse Analytics (2018–2022)
+- Delivered 121% average quota attainment over 4 consecutive years ($1.15M annual quota).
+- Built outbound executive pipeline and mentored 3 junior Account Executives on Salesforce CRM hygiene.
+
+EDUCATION
+B.S. in Economics — University of California, Berkeley`
+            },
+            {
+              name: 'Marcus Vance',
+              role: 'Senior Account Executive · VertexOps',
+              location: 'Austin, TX',
+              email: 'marcus.vance@example.com',
+              text: `MARCUS VANCE
+Senior Account Executive | Austin, TX | marcus.vance@example.com
+
+SUMMARY
+6 years of B2B SaaS full-cycle sales experience selling workflow automation to mid-market and emerging enterprise accounts.
+
+EXPERIENCE
+Senior Account Executive — VertexOps (2021–Present)
+- Closed $1.25M net-new ARR in FY2025 (118% of $1.06M annual quota).
+- Managed Salesforce CRM pipeline forecasting and reviewed weekly discovery calls in Gong.
+- Led multi-threaded executive demos with VP of Operations and Director-level buyers (average ACV $85K).
+- Used BANT and SPIN discovery frameworks to shorten sales cycles from 90 to 62 days.
+
+Account Executive — BrightRoute Software (2020–2021)
+- Consistently ranked top 15% of 22 reps closing net-new B2B SaaS logos.
+
+EDUCATION
+B.A. in Business Administration — University of Texas at Austin`
+            },
+            {
+              name: 'Priya Nair',
+              role: 'Enterprise Account Manager · FinGrid Cloud',
+              location: 'New York, NY',
+              email: 'priya.nair@example.com',
+              text: `PRIYA NAIR
+Enterprise Account Manager | New York, NY | priya.nair@example.com
+
+SUMMARY
+5.5 years of B2B SaaS customer expansion and enterprise renewal management across financial services clients.
+
+EXPERIENCE
+Enterprise Account Manager — FinGrid Cloud (2022–Present)
+- Managed $3.4M renewal book and drove $1.1M in annual upsell expansion (114% net dollar retention).
+- Partnered with C-suite sponsors during quarterly business reviews and contract renewals.
+- Maintained account health records in Salesforce CRM and Gainsight.
+
+Customer Success Manager — LedgerLink (2020–2022)
+- Reduced annual churn from 9.2% to 4.1% across 35 mid-market B2B SaaS accounts.
+
+EDUCATION
+B.S. in Finance — New York University`
+            },
+            {
+              name: 'David Kowalski',
+              role: 'SMB Account Executive · QuickFlow HQ',
+              location: 'Chicago, IL',
+              email: 'david.kowalski@example.com',
+              text: `DAVID KOWALSKI
+SMB Account Executive | Chicago, IL | david.kowalski@example.com
+
+SUMMARY
+4 years of high-velocity B2B SaaS closing experience focused on SMB and lower mid-market teams.
+
+EXPERIENCE
+Account Executive — QuickFlow HQ (2023–Present)
+- Achieved 112% quota attainment against a $480K annual ARR target ($538K closed).
+- Managed high-volume inbound and outbound demos using Salesforce CRM and HubSpot.
+- Closed 64 single-stakeholder deals (average ACV $8.4K) with 21-day average sales cycle.
+
+Inside Sales Representative — MetroCloud (2022–2023)
+- Consistently exceeded monthly demo-to-close conversion targets.
+
+EDUCATION
+MBA in Marketing — DePaul University
+B.A. in Communications — University of Illinois`
+            },
+            {
+              name: 'Jordan Alvarez',
+              role: 'Senior Sales Development Rep · PulseReach',
+              location: 'Denver, CO',
+              email: 'jordan.alvarez@example.com',
+              text: `JORDAN ALVAREZ
+Sales Development Representative | Denver, CO | jordan.alvarez@example.com
+
+SUMMARY
+2.5 years of outbound prospecting, cold calling, and retail sales leadership.
+
+EXPERIENCE
+Senior Sales Development Representative — PulseReach (2024–Present)
+- Booked 185+ qualified outbound discovery meetings for Account Executives using Outreach and Salesforce CRM.
+- Ranked #1 SDR in Q3 2025 for cold-call connect rate (14.5%).
+
+Retail Sales Supervisor — PeakTech Electronics (2023–2024)
+- Led a 6-person store team and exceeded monthly point-of-sale revenue targets by 15%.
+
+EDUCATION
+Associate's Degree in Communications — Front Range Community College`
+            }
+          ]
+        },
+        {
+          id: 'staff-frontend',
+          label: 'Frontend Eng',
+          title: 'Staff Frontend Engineer (React & TypeScript)',
+          requirements: [
+            '7+ years of production frontend engineering experience',
+            'Deep expertise in React, TypeScript, and modern state management',
+            'Experience architecting design systems and WCAG AA accessibility',
+            'Proven track record optimizing Core Web Vitals and bundle performance',
+            "Bachelor's degree in Computer Science, Software Engineering, or equivalent"
+          ].join('\n'),
+          weights: { exp: 35, skills: 55, edu: 10 },
+          sampleResumes: [
+            {
+              name: 'Hannah Lindqvist',
+              role: 'Staff Frontend Engineer · LinearFlow',
+              location: 'Seattle, WA',
+              email: 'hannah.l@example.com',
+              text: `HANNAH LINDQVIST
+Staff Frontend Engineer | Seattle, WA | hannah.l@example.com
+
+SUMMARY
+9 years of production frontend engineering experience building enterprise SaaS platforms.
+
+EXPERIENCE
+Staff Frontend Engineer — LinearFlow (2022–Present)
+- Architected multi-brand React and TypeScript design system adopted by 14 product squads with full WCAG AA accessibility compliance.
+- Reduced Largest Contentful Paint (LCP) from 3.4s to 1.1s and cut main bundle size by 48% to pass Core Web Vitals across 98% of sessions.
+- Standardized Zustand and React Query state management patterns across 300k+ LOC monorepo.
+
+Senior Frontend Engineer — MetricGrid (2017–2022)
+- Led migration from legacy AngularJS to React and TypeScript with zero downtime.
+
+EDUCATION
+B.S. in Computer Science — University of Washington`
+            },
+            {
+              name: 'Devon Brooks',
+              role: 'Senior Frontend Engineer · PayOrbit',
+              location: 'New York, NY',
+              email: 'devon.brooks@example.com',
+              text: `DEVON BROOKS
+Senior Frontend Engineer | New York, NY | devon.brooks@example.com
+
+SUMMARY
+7 years of frontend engineering experience specializing in React, TypeScript, and real-time dashboards.
+
+EXPERIENCE
+Senior Frontend Engineer — PayOrbit (2021–Present)
+- Built high-frequency merchant analytics UI in React, TypeScript, and Redux Toolkit.
+- Improved Core Web Vitals INP score by 42% through code-splitting and memoization.
+- Contributed reusable chart and form primitives to internal component library.
+
+Frontend Developer — NovaWeb (2019–2021)
+- Delivered responsive customer portals in React and Tailwind CSS.
+
+EDUCATION
+B.S. in Software Engineering — Rochester Institute of Technology`
+            },
+            {
+              name: 'Kenji Takahashi',
+              role: 'Full-Stack Engineer · CloudDock',
+              location: 'San Jose, CA',
+              email: 'kenji.t@example.com',
+              text: `KENJI TAKAHASHI
+Full-Stack Engineer | San Jose, CA | kenji.t@example.com
+
+SUMMARY
+5 years of full-stack development across Node.js, PostgreSQL, and React frontends.
+
+EXPERIENCE
+Full-Stack Engineer — CloudDock (2022–Present)
+- Built internal admin tools using React, TypeScript, and GraphQL APIs.
+- Maintained CI/CD deployment pipelines and backend microservices in Node.js.
+
+Software Engineer — ByteCraft (2021–2022)
+- Developed REST endpoints and responsive marketing pages.
+
+EDUCATION
+B.S. in Computer Science — San Jose State University`
+            },
+            {
+              name: 'Sofia Morales',
+              role: 'UI Developer · StudioBright',
+              location: 'Miami, FL',
+              email: 'sofia.m@example.com',
+              text: `SOFIA MORALES
+UI Developer | Miami, FL | sofia.m@example.com
+
+SUMMARY
+4 years of UI engineering focused on marketing websites, CSS animations, and design handoff.
+
+EXPERIENCE
+UI Developer — StudioBright (2023–Present)
+- Built accessible WCAG AA landing pages using HTML5, CSS, Vue.js, and vanilla JavaScript.
+- Collaborated with brand designers in Figma to deliver pixel-accurate responsive templates.
+
+Junior Web Developer — PixelForge (2022–2023)
+- Maintained WordPress themes and Shopify storefronts.
+
+EDUCATION
+B.F.A. in Graphic Design — Florida International University`
+            },
+            {
+              name: 'Tyler Grant',
+              role: 'Backend Systems Engineer · CoreData',
+              location: 'Boston, MA',
+              email: 'tyler.g@example.com',
+              text: `TYLER GRANT
+Backend Systems Engineer | Boston, MA | tyler.g@example.com
+
+SUMMARY
+6 years of backend distributed systems engineering in Go, Python, and Kubernetes.
+
+EXPERIENCE
+Senior Backend Engineer — CoreData (2021–Present)
+- Designed high-throughput Kafka ingestion pipelines processing 1.2M events/sec in Go and Python.
+- Managed Kubernetes clusters and Terraform infrastructure on AWS.
+
+Software Engineer — DataVault (2020–2021)
+- Built PostgreSQL data warehouses and internal Python CLI utilities.
+
+EDUCATION
+M.S. in Computer Science — Northeastern University`
+            }
+          ]
+        },
+        {
+          id: 'senior-pm',
+          label: 'FinTech PM',
+          title: 'Senior Product Manager — FinTech Payments',
+          requirements: [
+            '5+ years of product management experience in FinTech or B2B payments',
+            'Hands-on experience with Stripe, ACH, FedNow, or card issuing rails',
+            'Proven ownership of SQL data analysis, A/B experimentation, and PRDs',
+            'Strong track record collaborating with Compliance, Risk, and Engineering teams',
+            "Bachelor's or Master's degree in Business, Engineering, or Economics"
+          ].join('\n'),
+          weights: { exp: 40, skills: 45, edu: 15 },
+          sampleResumes: [
+            {
+              name: 'Amara Okafor',
+              role: 'Senior Product Manager · ClearPay Treasury',
+              location: 'New York, NY',
+              email: 'amara.o@example.com',
+              text: `AMARA OKAFOR
+Senior Product Manager — Payments | New York, NY | amara.o@example.com
+
+SUMMARY
+7 years of product management experience scaling B2B payments and embedded treasury rails.
+
+EXPERIENCE
+Senior Product Manager — ClearPay Treasury (2022–Present)
+- Launched instant ACH and FedNow settlement workflows processing $420M monthly volume.
+- Partnered daily with Compliance, Risk, and Engineering teams to cut false-positive fraud holds by 31%.
+- Authored detailed PRDs, ran SQL cohort analyses in Snowflake, and led 18+ A/B experimentation rollouts.
+- Managed Stripe Connect and virtual card issuing API integrations.
+
+Product Manager — SwiftLedger (2019–2022)
+- Owned checkout conversion roadmap, lifting B2B invoice payment completion by 14%.
+
+EDUCATION
+MBA — Columbia Business School
+B.S. in Industrial Engineering — Georgia Tech`
+            },
+            {
+              name: 'Liam Gallagher',
+              role: 'Product Manager · MerchantHub',
+              location: 'Chicago, IL',
+              email: 'liam.g@example.com',
+              text: `LIAM GALLAGHER
+Product Manager | Chicago, IL | liam.g@example.com
+
+SUMMARY
+5.5 years of FinTech product management focused on merchant onboarding and Stripe billing.
+
+EXPERIENCE
+Product Manager — MerchantHub (2022–Present)
+- Owned Stripe subscription billing and ACH payout reconciliation features for 12,000 SMB merchants.
+- Wrote PRDs and partnered closely with Engineering and Compliance on KYC verification flows.
+- Built KPI dashboards in Looker and Mixpanel.
+
+Associate Product Manager — PayTrack (2020–2022)
+- Assisted with mobile invoicing releases and customer interviews.
+
+EDUCATION
+B.A. in Economics — University of Michigan`
+            },
+            {
+              name: 'Chloe Chen',
+              role: 'Senior Product Manager · HealthSync',
+              location: 'San Francisco, CA',
+              email: 'chloe.c@example.com',
+              text: `CHLOE CHEN
+Senior Product Manager | San Francisco, CA | chloe.c@example.com
+
+SUMMARY
+6 years of B2B SaaS product management in healthcare scheduling and analytics.
+
+EXPERIENCE
+Senior Product Manager — HealthSync (2021–Present)
+- Led SQL data analysis, A/B experimentation, and PRD authoring for a 3-squad Engineering group.
+- Partnered with HIPAA Compliance and legal teams on enterprise audit logging.
+
+Product Manager — CareFlow (2020–2021)
+- Launched patient intake portal reducing clinic check-in time by 28%.
+
+EDUCATION
+B.S. in Biomedical Engineering — Johns Hopkins University`
+            },
+            {
+              name: 'Mateo Silva',
+              role: 'Operations & Risk Analyst · FinBridge',
+              location: 'Austin, TX',
+              email: 'mateo.s@example.com',
+              text: `MATEO SILVA
+Payments Operations & Risk Analyst | Austin, TX | mateo.s@example.com
+
+SUMMARY
+4 years of payments operations, chargeback investigations, and SQL reporting.
+
+EXPERIENCE
+Senior Payments Operations Analyst — FinBridge (2023–Present)
+- Investigated ACH return anomalies and card issuing fraud spikes alongside Compliance and Risk teams.
+- Wrote daily SQL queries to monitor settlement delays across Stripe and banking partners.
+
+Risk Analyst — CardGuard (2022–2023)
+- Reviewed manual transaction flags and updated fraud rules.
+
+EDUCATION
+B.B.A. in Finance — University of Texas at Austin`
+            },
+            {
+              name: 'Rachel Greenwald',
+              role: 'Marketing Program Manager · BrandPulse',
+              location: 'Los Angeles, CA',
+              email: 'rachel.g@example.com',
+              text: `RACHEL GREENWALD
+Marketing Program Manager | Los Angeles, CA | rachel.g@example.com
+
+SUMMARY
+3.5 years of B2C lifecycle marketing, campaign operations, and event management.
+
+EXPERIENCE
+Marketing Program Manager — BrandPulse (2023–Present)
+- Managed quarterly email campaigns, webinar launches, and agency budgets across consumer brands.
+- Coordinated creative briefs and social media calendars in Asana.
+
+Marketing Coordinator — VividMedia (2022–2023)
+- Supported influencer partnerships and paid search reporting.
+
+EDUCATION
+B.A. in Journalism — University of Southern California`
+            }
+          ]
+        }
+      ];
+
+      const PROVIDER_DEFAULTS = {
+        builtin: { label: 'Built-In Strict Rubric', model: '', endpoint: '' },
+        gemini: { label: 'Google Gemini', model: 'gemini-2.5-flash', endpoint: 'https://generativelanguage.googleapis.com/v1beta/models' },
+        openai: { label: 'OpenAI', model: 'gpt-4o-mini', endpoint: 'https://api.openai.com/v1/chat/completions' },
+        anthropic: { label: 'Anthropic Claude', model: 'claude-3-5-sonnet-latest', endpoint: 'https://api.anthropic.com/v1/messages' },
+        custom: { label: 'Custom API', model: 'llama-3.3-70b-versatile', endpoint: 'https://api.groq.com/openai/v1/chat/completions' }
+      };
+
+      // ============================================================
+      // 2. APPLICATION STATE & SAFE LOCAL PERSISTENCE
+      // ============================================================
+      const STORAGE_KEY_API = 'talentlens_custom_api_v2';
+      const STORAGE_KEY_STATE = 'talentlens_workspace_v2';
+
+      const state = {
+        sampleJobIndex: 0,
+        jobTitle: SAMPLE_JOBS[0].title,
+        jobRequirements: SAMPLE_JOBS[0].requirements,
+        weights: { ...SAMPLE_JOBS[0].weights },
+        candidates: [],
+        filter: 'all',
+        searchQuery: '',
+        activeDrawerCandidateId: null,
+        isProcessing: false,
+        apiConfig: {
+          provider: 'builtin', // 'builtin' | 'gemini' | 'openai' | 'anthropic' | 'custom'
+          apiKey: '',
+          model: '',
+          endpoint: '',
+          persist: true
+        }
+      };
+
+      function loadSavedState() {
+        try {
+          const rawApi = localStorage.getItem(STORAGE_KEY_API);
+          if (rawApi) {
+            const parsed = JSON.parse(rawApi);
+            if (parsed && typeof parsed === 'object') {
+              state.apiConfig = { ...state.apiConfig, ...parsed };
+            }
+          }
+          const rawWs = localStorage.getItem(STORAGE_KEY_STATE);
+          if (rawWs) {
+            const ws = JSON.parse(rawWs);
+            if (ws && Array.isArray(ws.candidates) && ws.candidates.length > 0) {
+              state.jobTitle = ws.jobTitle || state.jobTitle;
+              state.jobRequirements = ws.jobRequirements || state.jobRequirements;
+              if (ws.weights) state.weights = { ...state.weights, ...ws.weights };
+              state.candidates = ws.candidates;
+            }
+          }
+        } catch (_) {}
+      }
+
+      function persistWorkspace() {
+        try {
+          localStorage.setItem(
+            STORAGE_KEY_STATE,
+            JSON.stringify({
+              jobTitle: state.jobTitle,
+              jobRequirements: state.jobRequirements,
+              weights: state.weights,
+              candidates: state.candidates
+            })
+          );
+        } catch (_) {}
+      }
+
+      function persistApiConfig() {
+        try {
+          if (state.apiConfig.persist) {
+            localStorage.setItem(STORAGE_KEY_API, JSON.stringify(state.apiConfig));
+          } else {
+            localStorage.removeItem(STORAGE_KEY_API);
+          }
+        } catch (_) {}
+      }
+
+      // ============================================================
+      // 3. DOM REFERENCES
+      // ============================================================
+      const dom = {
+        jobTitleInput: document.getElementById('jobTitleInput'),
+        jobRequirementsInput: document.getElementById('jobRequirementsInput'),
+        loadSampleJobBtn: document.getElementById('loadSampleJobBtn'),
+        sampleJobIndicator: document.getElementById('sampleJobIndicator'),
+        weightExp: document.getElementById('weightExp'),
+        weightSkills: document.getElementById('weightSkills'),
+        weightEdu: document.getElementById('weightEdu'),
+        weightExpVal: document.getElementById('weightExpVal'),
+        weightSkillsVal: document.getElementById('weightSkillsVal'),
+        weightEduVal: document.getElementById('weightEduVal'),
+        barExp: document.getElementById('barExp'),
+        barSkills: document.getElementById('barSkills'),
+        barEdu: document.getElementById('barEdu'),
+        reEvaluateBtn: document.getElementById('reEvaluateBtn'),
+        sidebarEngineDesc: document.getElementById('sidebarEngineDesc'),
+        sidebarApiBtn: document.getElementById('sidebarApiBtn'),
+
+        dropZone: document.getElementById('dropZone'),
+        fileInput: document.getElementById('fileInput'),
+        togglePasteBtn: document.getElementById('togglePasteBtn'),
+        pasteResumePanel: document.getElementById('pasteResumePanel'),
+        closePasteBtn: document.getElementById('closePasteBtn'),
+        pasteCandidateName: document.getElementById('pasteCandidateName'),
+        pasteCandidateRole: document.getElementById('pasteCandidateRole'),
+        pasteResumeText: document.getElementById('pasteResumeText'),
+        screenPastedBtn: document.getElementById('screenPastedBtn'),
+        loadSampleResumesBtn: document.getElementById('loadSampleResumesBtn'),
+        emptyStateSampleBtn: document.getElementById('emptyStateSampleBtn'),
+        processingState: document.getElementById('processingState'),
+        processingTitle: document.getElementById('processingTitle'),
+        processingPercent: document.getElementById('processingPercent'),
+        processingBar: document.getElementById('processingBar'),
+        processingSubtext: document.getElementById('processingSubtext'),
+
+        kpiStrip: document.getElementById('kpiStrip'),
+        kpiTotal: document.getElementById('kpiTotal'),
+        kpiStrong: document.getElementById('kpiStrong'),
+        kpiAvg: document.getElementById('kpiAvg'),
+        kpiShortlisted: document.getElementById('kpiShortlisted'),
+
+        leaderboardCountBadge: document.getElementById('leaderboardCountBadge'),
+        shortlistTabCount: document.getElementById('shortlistTabCount'),
+        candidateSearchInput: document.getElementById('candidateSearchInput'),
+        exportSummaryBtn: document.getElementById('exportSummaryBtn'),
+        emptyState: document.getElementById('emptyState'),
+        noFilterMatchState: document.getElementById('noFilterMatchState'),
+        clearFiltersBtn: document.getElementById('clearFiltersBtn'),
+        tableWrapper: document.getElementById('tableWrapper'),
+        leaderboardBody: document.getElementById('leaderboardBody'),
+
+        drawerContainer: document.getElementById('drawerContainer'),
+        drawerBackdrop: document.getElementById('drawerBackdrop'),
+        drawerPanel: document.getElementById('drawerPanel'),
+        closeDrawerBtn: document.getElementById('closeDrawerBtn'),
+        drawerAvatar: document.getElementById('drawerAvatar'),
+        drawerCandidateName: document.getElementById('drawerCandidateName'),
+        drawerScoreBadge: document.getElementById('drawerScoreBadge'),
+        drawerCandidateMeta: document.getElementById('drawerCandidateMeta'),
+        drawerContactMeta: document.getElementById('drawerContactMeta'),
+        drawerEngineTag: document.getElementById('drawerEngineTag'),
+        drawerWeightExp: document.getElementById('drawerWeightExp'),
+        drawerWeightSkills: document.getElementById('drawerWeightSkills'),
+        drawerWeightEdu: document.getElementById('drawerWeightEdu'),
+        drawerSubExp: document.getElementById('drawerSubExp'),
+        drawerSubSkills: document.getElementById('drawerSubSkills'),
+        drawerSubEdu: document.getElementById('drawerSubEdu'),
+        drawerSummary: document.getElementById('drawerSummary'),
+        drawerEvidenceList: document.getElementById('drawerEvidenceList'),
+        drawerQuestionsList: document.getElementById('drawerQuestionsList'),
+        drawerNotesInput: document.getElementById('drawerNotesInput'),
+        drawerRawResume: document.getElementById('drawerRawResume'),
+        drawerShortlistBtn: document.getElementById('drawerShortlistBtn'),
+        copyGuideBtn: document.getElementById('copyGuideBtn'),
+
+        summaryModal: document.getElementById('summaryModal'),
+        summarySheet: document.getElementById('summarySheet'),
+        summaryScopeBadge: document.getElementById('summaryScopeBadge'),
+        closeSummaryModalBtn: document.getElementById('closeSummaryModalBtn'),
+        copySummaryTextBtn: document.getElementById('copySummaryTextBtn'),
+        printSummaryBtn: document.getElementById('printSummaryBtn'),
+        downloadSummaryHtmlBtn: document.getElementById('downloadSummaryHtmlBtn'),
+
+        apiConfigBtn: document.getElementById('apiConfigBtn'),
+        engineStatusDot: document.getElementById('engineStatusDot'),
+        engineStatusLabel: document.getElementById('engineStatusLabel'),
+        apiDrawerContainer: document.getElementById('apiDrawerContainer'),
+        apiDrawerBackdrop: document.getElementById('apiDrawerBackdrop'),
+        apiDrawerPanel: document.getElementById('apiDrawerPanel'),
+        closeApiModalBtn: document.getElementById('closeApiModalBtn'),
+        apiProviderSelect: document.getElementById('apiProviderSelect'),
+        builtinInfoBox: document.getElementById('builtinInfoBox'),
+        externalApiFields: document.getElementById('externalApiFields'),
+        apiKeyInput: document.getElementById('apiKeyInput'),
+        toggleKeyVisBtn: document.getElementById('toggleKeyVisBtn'),
+        apiModelInput: document.getElementById('apiModelInput'),
+        customEndpointGroup: document.getElementById('customEndpointGroup'),
+        apiEndpointInput: document.getElementById('apiEndpointInput'),
+        persistKeyCheckbox: document.getElementById('persistKeyCheckbox'),
+        testApiBtn: document.getElementById('testApiBtn'),
+        apiTestResult: document.getElementById('apiTestResult'),
+        clearApiKeyBtn: document.getElementById('clearApiKeyBtn'),
+        saveApiKeyBtn: document.getElementById('saveApiKeyBtn'),
+
+        resetDemoBtn: document.getElementById('resetDemoBtn'),
+        toastContainer: document.getElementById('toastContainer')
+      };
+
+      // ============================================================
+      // 4. UTILITIES
+      // ============================================================
+      function escapeHtml(str) {
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function getInitials(name) {
+        const parts = String(name || 'CA').trim().split(/\s+/);
+        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      }
+
+      function getNormalizedWeights() {
+        const rawExp = Number(state.weights.exp) || 0;
+        const rawSkills = Number(state.weights.skills) || 0;
+        const rawEdu = Number(state.weights.edu) || 0;
+        const sum = rawExp + rawSkills + rawEdu;
+        if (sum <= 0) return { exp: 34, skills: 33, edu: 33 };
+        const exp = Math.round((rawExp / sum) * 100);
+        const skills = Math.round((rawSkills / sum) * 100);
+        const edu = Math.max(0, 100 - exp - skills);
+        return { exp, skills, edu };
+      }
+
+      function computeCompositeScore(subScores) {
+        const w = getNormalizedWeights();
+        const total =
+          (subScores.experience * w.exp +
+            subScores.skills * w.skills +
+            subScores.education * w.edu) /
+          100;
+        return Math.max(1, Math.min(100, Math.round(total)));
+      }
+
+      function getScoreBand(score) {
+        if (score >= 80) {
+          return {
+            label: 'Strong Match',
+            badgeClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+            barClass: 'bg-emerald-500',
+            dotClass: 'bg-emerald-500'
+          };
+        }
+        if (score >= 60) {
+          return {
+            label: 'Moderate Match',
+            badgeClass: 'bg-amber-50 text-amber-800 border border-amber-200',
+            barClass: 'bg-amber-500',
+            dotClass: 'bg-amber-500'
+          };
+        }
+        return {
+          label: 'Weak Match',
+          badgeClass: 'bg-rose-50 text-rose-700 border border-rose-200',
+          barClass: 'bg-rose-500',
+          dotClass: 'bg-rose-500'
+        };
+      }
+
+      function showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        const styles = {
+          success: 'bg-slate-900 text-white border-emerald-500/40',
+          error: 'bg-rose-950 text-rose-50 border-rose-500/40',
+          info: 'bg-slate-900 text-white border-indigo-400/40'
+        };
+        const iconName = type === 'success' ? 'check-circle-2' : type === 'error' ? 'alert-circle' : 'info';
+        const iconColor = type === 'success' ? 'text-emerald-400' : type === 'error' ? 'text-rose-400' : 'text-indigo-400';
+
+        toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-lg text-xs sm:text-sm font-medium max-w-sm transition-all duration-200 translate-y-2 opacity-0 ${styles[type] || styles.info}`;
+        toast.innerHTML = `<i data-lucide="${iconName}" class="w-4 h-4 shrink-0 ${iconColor}"></i><span>${escapeHtml(message)}</span>`;
+        dom.toastContainer.appendChild(toast);
+        if (window.lucide) window.lucide.createIcons({ nodes: [toast] });
+
+        requestAnimationFrame(() => toast.classList.remove('translate-y-2', 'opacity-0'));
+        setTimeout(() => {
+          toast.classList.add('translate-y-2', 'opacity-0');
+          setTimeout(() => toast.remove(), 220);
+        }, 3200);
+      }
+
+      function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+        }
+        return Promise.resolve(fallbackCopy(text));
+      }
+
+      function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+          document.execCommand('copy');
+        } finally {
+          document.body.removeChild(ta);
+        }
+      }
+
+      // ============================================================
+      // 5. UNIVERSAL RESUME PARSER (PDF, DOCX, TXT, PASTE)
+      // ============================================================
+      async function extractTextFromFile(file) {
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        if (ext === 'txt' || file.type === 'text/plain') {
+          return await file.text();
+        }
+        if (ext === 'docx' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+          if (window.mammoth) {
+            try {
+              const arrayBuffer = await file.arrayBuffer();
+              const res = await window.mammoth.extractRawText({ arrayBuffer });
+              if (res && res.value && res.value.trim().length > 10) {
+                return res.value.trim();
+              }
+            } catch (_) {}
+          }
+          return await file.text();
+        }
+        if (ext === 'pdf' || file.type === 'application/pdf') {
+          if (window.pdfjsLib) {
+            try {
+              const buffer = await file.arrayBuffer();
+              const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+              const pages = [];
+              for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                // Reconstruct lines using Y-coordinate breaks for accurate quote extraction
+                let lastY = null;
+                let line = '';
+                const pageLines = [];
+                for (const item of content.items) {
+                  const y = item.transform ? Math.round(item.transform[5]) : null;
+                  if (lastY !== null && y !== null && Math.abs(y - lastY) > 4) {
+                    if (line.trim()) pageLines.push(line.trim());
+                    line = item.str;
+                  } else {
+                    line += (line && !line.endsWith(' ') && !item.str.startsWith(' ') ? ' ' : '') + item.str;
+                  }
+                  lastY = y;
+                }
+                if (line.trim()) pageLines.push(line.trim());
+                pages.push(pageLines.join('\n'));
+              }
+              const joined = pages.join('\n').trim();
+              if (joined.length > 15) return joined;
+            } catch (_) {}
+          }
+          const raw = await file.text();
+          const cleaned = raw.replace(/[^\x20-\x7E\n\r\t]/g, ' ').replace(/\s{3,}/g, '\n').trim();
+          return cleaned || `Uploaded PDF: ${file.name}`;
+        }
+        return await file.text();
+      }
+
+      function parseCandidateMetadata(rawText, fallbackName, fallbackRole) {
+        const text = String(rawText || '');
+        const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+
+        // Extract email & phone
+        const emailMatch = text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
+        const phoneMatch = text.match(/(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}/);
+        const email = emailMatch ? emailMatch[0] : '';
+        const phone = phoneMatch ? phoneMatch[0] : '';
+
+        let name = fallbackName || '';
+        if (!name && lines.length > 0) {
+          for (const candidateLine of lines.slice(0, 4)) {
+            const stripped = candidateLine
+              .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '')
+              .replace(/\|.*/g, '')
+              .replace(/[^A-Za-z\s.'-]/g, '')
+              .trim();
+            const words = stripped.split(/\s+/).filter(Boolean);
+            if (words.length >= 2 && words.length <= 4 && stripped.length >= 4 && stripped.length <= 42 && !/^(resume|curriculum|vitae|summary|profile|experience)$/i.test(stripped)) {
+              name = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+              break;
+            }
+          }
+        }
+        if (!name) name = 'Uploaded Candidate';
+
+        let role = fallbackRole || '';
+        let location = 'Location not listed';
+        if (lines.length > 1) {
+          const second = lines[1];
+          const parts = second.split(/[|•·]/).map(p => p.trim()).filter(Boolean);
+          if (!role && parts[0] && !parts[0].includes('@') && parts[0].length <= 65) {
+            role = parts[0];
+          }
+          for (const pt of parts.slice(1)) {
+            if (!pt.includes('@') && !/\d{4,}/.test(pt) && pt.length <= 40) {
+              location = pt;
+              break;
+            }
+          }
+        }
+        if (!role) role = 'Candidate Profile';
+
+        return { name, role, location, email, phone };
+      }
+
+      // Smarter Years-of-Experience Extractor (explicit "X years" OR inferred from date ranges like 2019–Present)
+      function extractYearsFromText(text) {
+        const str = String(text || '');
+        const explicitMatches = [...str.matchAll(/(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)/gi)];
+        let maxExplicit = explicitMatches.length ? Math.max(...explicitMatches.map(m => parseFloat(m[1]))) : null;
+
+        // Also scan employment year ranges like 2018-2025 or 2020–Present
+        const nowYear = new Date().getFullYear();
+        const rangeMatches = [...str.matchAll(/\b(199\d|20[0-2]\d)\s*(?:–|-|to)\s*(present|current|now|20[0-2]\d)\b/gi)];
+        let spanYears = null;
+        if (rangeMatches.length) {
+          let minStart = 9999;
+          let maxEnd = 0;
+          for (const m of rangeMatches) {
+            const s = parseInt(m[1], 10);
+            const e = /present|current|now/i.test(m[2]) ? nowYear : parseInt(m[2], 10);
+            if (e >= s && e - s <= 40) {
+              if (s < minStart) minStart = s;
+              if (e > maxEnd) maxEnd = e;
+            }
+          }
+          if (maxEnd >= minStart && minStart < 9999) {
+            spanYears = Math.max(0.5, maxEnd - minStart);
+          }
+        }
+
+        if (maxExplicit !== null && spanYears !== null) return Math.max(maxExplicit, Math.min(spanYears, maxExplicit + 4));
+        return maxExplicit !== null ? maxExplicit : spanYears;
+      }
+
+      // ============================================================
+      // 6. STRICT EVIDENCE-BACKED BUILT-IN RUBRIC ENGINE
+      // ============================================================
+      const STOPWORDS = new Set([
+        'with', 'from', 'that', 'this', 'have', 'been', 'will', 'your', 'their', 'about',
+        'into', 'over', 'such', 'more', 'most', 'than', 'using', 'used', 'strong', 'proven',
+        'track', 'record', 'hands', 'experience', 'years', 'year', 'ability', 'skills',
+        'proficiency', 'deep', 'expertise', 'related', 'field', 'equivalent', 'degree',
+        'must', 'preferred', 'required', 'plus', 'across', 'modern', 'ownership', 'command',
+        'full', 'annual', 'teams', 'team', 'work', 'working', 'good', 'excellent', 'knowledge'
+      ]);
+
+      function parseRequirements(reqText) {
+        return String(reqText || '')
+          .split(/\n+/)
+          .map(line => line.replace(/^[-*•\d.)\s]+/, '').trim())
+          .filter(line => line.length > 3);
+      }
+
+      function extractResumeLines(text) {
+        return String(text || '')
+          .split(/\n+/)
+          .map(l => l.replace(/^[-*•\s]+/, '').trim())
+          .filter(l => l.length > 4);
+      }
+
+      function extractKeyTokens(line) {
+        const raw = line.match(/[A-Za-z0-9+$#/.&-]{2,}/g) || [];
+        const tokens = [];
+        for (const t of raw) {
+          const clean = t.replace(/^[.,;:()]+|[.,;:()]+$/g, '');
+          const low = clean.toLowerCase();
+          if (clean.length < 2 || STOPWORDS.has(low) || /^\d+\+?$/.test(clean)) continue;
+          tokens.push({ raw: clean, low });
+        }
+        return tokens;
+      }
+
+      function findBestQuote(resumeLines, tokens) {
+        let bestLine = '';
+        let bestHits = 0;
+        let matchedTerms = [];
+
+        for (const line of resumeLines) {
+          const lowLine = line.toLowerCase();
+          const hits = [];
+          for (const tok of tokens) {
+            // Exact substring or stem prefix (e.g. "negotiation" matches "negotiating")
+            const stem = tok.low.length >= 6 ? tok.low.slice(0, tok.low.length - 2) : tok.low;
+            if (lowLine.includes(tok.low) || (stem.length >= 5 && lowLine.includes(stem))) {
+              hits.push(tok.raw);
+            }
+          }
+          if (hits.length > bestHits) {
+            bestHits = hits.length;
+            bestLine = line;
+            matchedTerms = [...new Set(hits)];
+          }
+        }
+        return { quote: bestLine, hits: bestHits, matchedTerms };
+      }
+
+      function summarizeReqLabel(req) {
+        const cleaned = String(req || '').replace(
+          /^(proven track record of|proven track record|hands-on command of|hands-on experience with|deep expertise in|experience with|experience|proficiency with|strong track record)\s+/i,
+          ''
+        );
+        return cleaned.length > 52 ? cleaned.slice(0, 49).trim() + '...' : cleaned;
+      }
+
+      function buildTailoredQuestions(name, allEvidence, verified, missing, partial, jobTitle) {
+        const questions = [];
+
+        const primaryGap = missing[0] || partial[0];
+        if (primaryGap) {
+          const topic = summarizeReqLabel(primaryGap.requirement);
+          questions.push({
+            tag: primaryGap.status === 'missing' ? 'Missing Skill Probe' : 'Depth Check',
+            focus: topic,
+            question: `Your resume does not directly highlight "${topic}". Tell me about a specific situation where you handled a comparable challenge—what concrete actions did you take, and what was the measurable result?`,
+            listenFor: `Look for hands-on transferable execution rather than theory, and verify how fast ${name} can ramp up.`
+          });
+        }
+
+        const topClaim = verified[0] || allEvidence[0];
+        if (topClaim && topClaim.quote && !topClaim.quote.startsWith('No direct')) {
+          const snippet = topClaim.quote.length > 95 ? topClaim.quote.slice(0, 92).trim() + '...' : topClaim.quote;
+          questions.push({
+            tag: 'Claim Verification',
+            focus: summarizeReqLabel(topClaim.requirement),
+            question: `Your resume notes: "${snippet}" Walk me through your individual contribution versus your team's role, and share one obstacle that nearly derailed that outcome.`,
+            listenFor: `Verify personal ownership, concrete tools/metrics, and structured decision-making under pressure.`
+          });
+        }
+
+        const secondGap = missing[1] || partial[1] || partial[0];
+        if (secondGap && (!primaryGap || secondGap.requirement !== primaryGap.requirement)) {
+          const topic2 = summarizeReqLabel(secondGap.requirement);
+          questions.push({
+            tag: 'Risk Verification',
+            focus: topic2,
+            question: `For this ${jobTitle || 'role'}, "${topic2}" is a day-one priority. Describe the closest project or deal you owned in this area—what went wrong initially, and how did you adapt?`,
+            listenFor: `Assess self-awareness, structured problem solving, and honest scoping of past experience.`
+          });
+        } else {
+          questions.push({
+            tag: 'Cross-Functional Execution',
+            focus: `Seniority & Scale for ${jobTitle || 'Role'}`,
+            question: `Tell me about a high-stakes initiative where internal stakeholders disagreed with your approach. How did you align leadership and still hit your target milestone?`,
+            listenFor: `Look for executive communication, stakeholder alignment, and quantifiable accountability.`
+          });
+        }
+
+        while (questions.length < 3) {
+          questions.push({
+            tag: 'Execution Rigor',
+            focus: 'Role Readiness',
+            question: `Walk me through your most complex project from the past 18 months. What trade-offs did you make, and what would you do differently today?`,
+            listenFor: `Evaluate structured thinking, ownership, and continuous improvement.`
+          });
+        }
+        return questions.slice(0, 3);
+      }
+
+      function evaluateCandidateLocally(candidateInput, jobTitle, reqText) {
+        const resumeText = candidateInput.text || '';
+        const resumeLines = extractResumeLines(resumeText);
+        const reqLines = parseRequirements(reqText);
+
+        // 1. Experience Sub-Score
+        const reqYears = extractYearsFromText(reqText) || 5;
+        const candYears = extractYearsFromText(resumeText);
+        let expScore = 50;
+        if (candYears !== null) {
+          if (candYears >= reqYears) {
+            expScore = Math.min(98, 84 + Math.min(14, (candYears - reqYears) * 4));
+          } else {
+            expScore = Math.max(28, Math.round((candYears / reqYears) * 78));
+          }
+        } else {
+          expScore = resumeLines.length >= 10 ? 64 : 44;
+        }
+
+        const lowTitle = String(jobTitle || '').toLowerCase();
+        if (lowTitle.includes('senior') || lowTitle.includes('staff') || lowTitle.includes('lead')) {
+          if (/\b(staff|principal|enterprise|senior|lead|manager|director)\b/i.test(resumeText)) {
+            expScore = Math.min(98, expScore + 5);
+          } else if (/\b(junior|intern|sdr|coordinator|retail|fresher)\b/i.test(resumeText)) {
+            expScore = Math.max(25, expScore - 14);
+          }
+        }
+
+        // 2. Education Sub-Score
+        const wantsMaster = /\b(master|mba|m\.s\.|m\.a\.|m\.tech|phd)\b/i.test(reqText);
+        const wantsBachelor = /\b(bachelor|b\.s\.|b\.a\.|b\.tech|b\.e\.|b\.sc|b\.b\.a\.|degree)\b/i.test(reqText);
+        const hasMaster = /\b(mba|master|m\.s\.|m\.a\.|m\.tech|mca|phd)\b/i.test(resumeText);
+        const hasBachelor = /\b(b\.s\.|b\.a\.|b\.tech|b\.e\.|b\.sc|b\.b\.a\.|b\.f\.a\.|bca|bachelor)\b/i.test(resumeText);
+        const hasAssociate = /\b(associate'?s?|diploma)\b/i.test(resumeText);
+
+        let eduScore = 75;
+        if (hasMaster) eduScore = 96;
+        else if (hasBachelor) eduScore = wantsMaster && !wantsBachelor ? 78 : 90;
+        else if (hasAssociate) eduScore = wantsBachelor ? 52 : 75;
+        else eduScore = wantsBachelor ? 40 : 68;
+
+        // 3. Requirement-by-Requirement Evidence Extraction
+        const evidenceItems = [];
+        let reqScoreSum = 0;
+        const effectiveReqs = reqLines.length > 0 ? reqLines : [jobTitle || 'Role Requirements'];
+
+        for (const req of effectiveReqs) {
+          const tokens = extractKeyTokens(req);
+          const { quote, hits, matchedTerms } = findBestQuote(resumeLines, tokens);
+
+          const reqLineYears = extractYearsFromText(req);
+          const reqHasMillion = /\$1m/i.test(req);
+          const candHasMillion = /\$[1-9](?:\.\d+)?m/i.test(resumeText);
+
+          let ratio = tokens.length > 0 ? hits / Math.min(tokens.length, 4) : 0;
+
+          if (reqLineYears && candYears !== null) {
+            if (candYears >= reqLineYears) ratio = Math.max(ratio, 0.88);
+            else ratio = Math.min(ratio, (candYears / reqLineYears) * 0.65);
+          }
+          if (reqHasMillion) {
+            if (candHasMillion && /\b(quota|arr|closed|attainment)\b/i.test(resumeText)) {
+              ratio = Math.max(ratio, 0.92);
+            } else if (candHasMillion) {
+              ratio = Math.min(ratio, 0.65);
+            } else {
+              ratio = Math.min(ratio, 0.25);
+            }
+          }
+
+          let status = 'missing';
+          let itemScore = 22;
+          if (ratio >= 0.65) {
+            status = 'verified';
+            itemScore = Math.min(98, Math.round(82 + ratio * 16));
+          } else if (ratio >= 0.32 || hits >= 1) {
+            status = 'partial';
+            itemScore = Math.round(52 + ratio * 28);
+          }
+
+          reqScoreSum += itemScore;
+          evidenceItems.push({
+            requirement: req,
+            status,
+            matchedTerms,
+            quote:
+              status === 'missing'
+                ? 'No direct evidence found in the submitted resume text.'
+                : quote || 'Matched via resume keywords.'
+          });
+        }
+
+        const skillsScore = Math.max(20, Math.min(98, Math.round(reqScoreSum / effectiveReqs.length)));
+
+        const verifiedItems = evidenceItems.filter(e => e.status === 'verified');
+        const partialItems = evidenceItems.filter(e => e.status === 'partial');
+        const missingItems = evidenceItems.filter(e => e.status === 'missing');
+
+        const strengths = [];
+        for (const item of [...verifiedItems, ...partialItems]) {
+          if (strengths.length >= 2) break;
+          const shortQuote = item.quote.length > 76 ? item.quote.slice(0, 73).trim() + '...' : item.quote;
+          strengths.push(shortQuote);
+        }
+        if (strengths.length === 0) strengths.push('Resume parsed; no strong direct rubric matches found.');
+
+        const gaps = [];
+        for (const item of [...missingItems, ...partialItems]) {
+          if (gaps.length >= 2) break;
+          const label =
+            item.status === 'missing'
+              ? `Missing: ${summarizeReqLabel(item.requirement)}`
+              : `Partial: ${summarizeReqLabel(item.requirement)}`;
+          gaps.push(label);
+        }
+        if (candYears !== null && candYears < reqYears && !gaps.some(g => g.toLowerCase().includes('year'))) {
+          gaps.unshift(`Experience gap (${candYears} yrs vs. ${reqYears}+ yrs required)`);
+        }
+        if (gaps.length === 0) gaps.push('No critical rubric gaps detected');
+
+        const subScores = {
+          experience: Math.round(expScore),
+          skills: Math.round(skillsScore),
+          education: Math.round(eduScore)
+        };
+        const matchScore = computeCompositeScore(subScores);
+
+        const yearsNote = candYears !== null ? `${candYears} years of observed experience` : 'unstated total years of experience';
+        const summary = `Verified ${verifiedItems.length} of ${effectiveReqs.length} rubric criteria (${partialItems.length} partial, ${missingItems.length} missing) with ${yearsNote}. Every finding is grounded strictly in text extracted from ${candidateInput.name}'s resume.`;
+
+        const questions = buildTailoredQuestions(
+          candidateInput.name,
+          evidenceItems,
+          verifiedItems,
+          missingItems,
+          partialItems,
+          jobTitle
+        );
+
+        return {
+          id: candidateInput.id || 'cand_' + Math.random().toString(36).slice(2, 10),
+          name: candidateInput.name,
+          role: candidateInput.role,
+          location: candidateInput.location,
+          email: candidateInput.email || '',
+          phone: candidateInput.phone || '',
+          rawText: resumeText,
+          subScores,
+          matchScore,
+          strengths: strengths.slice(0, 2),
+          gaps: gaps.slice(0, 2),
+          summary,
+          evidence: evidenceItems,
+          questions,
+          notes: candidateInput.notes || '',
+          shortlisted: Boolean(candidateInput.shortlisted),
+          engineUsed: 'Built-In Strict Rubric'
+        };
+      }
+
+      // ============================================================
+      // 7. MULTI-PROVIDER CUSTOM API (BYOK) ENGINE
+      // ============================================================
+      function buildRubricPrompt(candidateInput, jobTitle, reqText) {
+        return `You are an enterprise HR resume screening engine. Evaluate the candidate STRICTLY against the Job Description below. Do NOT invent or assume any skills, degrees, or metrics not explicitly stated in the resume text.
+
+JOB TITLE: ${jobTitle}
+MUST-HAVE REQUIREMENTS:
+${reqText}
+
+CANDIDATE NAME: ${candidateInput.name}
+RESUME TEXT:
+${candidateInput.text}
+
+Return ONLY valid JSON (no markdown fences) matching this exact schema:
+{
+  "subScores": { "experience": 0, "skills": 0, "education": 0 },
+  "strengths": ["Top verified strength 1 (short)", "Top verified strength 2 (short)"],
+  "gaps": ["Missing skill or red flag 1", "Missing skill or red flag 2"],
+  "summary": "2-sentence evidence-backed summary.",
+  "evidence": [
+    {
+      "requirement": "Exact requirement text",
+      "status": "verified",
+      "quote": "Exact verbatim quote from resume or 'No direct evidence found in the submitted resume text.'"
+    }
+  ],
+  "questions": [
+    {
+      "tag": "Missing Skill Probe",
+      "focus": "Short competency focus",
+      "question": "Tailored behavioral interview question",
+      "listenFor": "What interviewer should listen for"
+    }
+  ]
+}`;
+      }
+
+      function extractJsonObject(rawText) {
+        const cleaned = String(rawText || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+        const firstBrace = cleaned.indexOf('{');
+        const lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace === -1 || lastBrace === -1) throw new Error('Invalid JSON response from API');
+        return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+      }
+
+      async function callExternalProvider(prompt, cfg) {
+        const provider = cfg.provider;
+        const apiKey = (cfg.apiKey || '').trim();
+        const model = (cfg.model || PROVIDER_DEFAULTS[provider]?.model || '').trim();
+
+        if (!apiKey) throw new Error('API key is empty');
+
+        if (provider === 'gemini') {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model || 'gemini-2.5-flash')}:generateContent?key=${encodeURIComponent(apiKey)}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.15, responseMimeType: 'application/json' }
+            })
+          });
+          if (!res.ok) throw new Error(`Gemini API HTTP ${res.status}`);
+          const data = await res.json();
+          return { text: data?.candidates?.[0]?.content?.parts?.[0]?.text || '', engineLabel: `Gemini (${model})` };
+        }
+
+        if (provider === 'openai' || provider === 'custom') {
+          const endpoint =
+            provider === 'openai'
+              ? 'https://api.openai.com/v1/chat/completions'
+              : (cfg.endpoint || '').trim();
+          if (!endpoint.startsWith('https://')) throw new Error('Custom endpoint must start with https://');
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              model: model || 'gpt-4o-mini',
+              temperature: 0.15,
+              messages: [
+                { role: 'system', content: 'You are a strict enterprise HR resume screening assistant. Always respond with valid JSON only.' },
+                { role: 'user', content: prompt }
+              ]
+            })
+          });
+          if (!res.ok) throw new Error(`API HTTP ${res.status}`);
+          const data = await res.json();
+          const label = provider === 'openai' ? `OpenAI (${model})` : `Custom API (${model})`;
+          return { text: data?.choices?.[0]?.message?.content || '', engineLabel: label };
+        }
+
+        if (provider === 'anthropic') {
+          const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify({
+              model: model || 'claude-3-5-sonnet-latest',
+              max_tokens: 1400,
+              temperature: 0.15,
+              messages: [{ role: 'user', content: prompt }]
+            })
+          });
+          if (!res.ok) throw new Error(`Anthropic API HTTP ${res.status}`);
+          const data = await res.json();
+          return { text: data?.content?.[0]?.text || '', engineLabel: `Claude (${model})` };
+        }
+
+        throw new Error('Unsupported provider');
+      }
+
+      async function evaluateCandidateWithCustomApi(candidateInput, jobTitle, reqText) {
+        const prompt = buildRubricPrompt(candidateInput, jobTitle, reqText);
+        const { text, engineLabel } = await callExternalProvider(prompt, state.apiConfig);
+        const parsed = extractJsonObject(text);
+
+        const subScores = {
+          experience: Math.max(1, Math.min(100, Math.round(Number(parsed?.subScores?.experience) || 50))),
+          skills: Math.max(1, Math.min(100, Math.round(Number(parsed?.subScores?.skills) || 50))),
+          education: Math.max(1, Math.min(100, Math.round(Number(parsed?.subScores?.education) || 50)))
+        };
+
+        return {
+          id: candidateInput.id || 'cand_' + Math.random().toString(36).slice(2, 10),
+          name: candidateInput.name,
+          role: candidateInput.role,
+          location: candidateInput.location,
+          email: candidateInput.email || '',
+          phone: candidateInput.phone || '',
+          rawText: candidateInput.text,
+          subScores,
+          matchScore: computeCompositeScore(subScores),
+          strengths: Array.isArray(parsed.strengths) && parsed.strengths.length ? parsed.strengths.slice(0, 2) : ['Verified rubric match'],
+          gaps: Array.isArray(parsed.gaps) && parsed.gaps.length ? parsed.gaps.slice(0, 2) : ['No critical gaps flagged'],
+          summary: parsed.summary || 'Evaluated strictly against job description criteria.',
+          evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
+          questions: Array.isArray(parsed.questions) && parsed.questions.length ? parsed.questions.slice(0, 3) : [],
+          notes: candidateInput.notes || '',
+          shortlisted: Boolean(candidateInput.shortlisted),
+          engineUsed: engineLabel
+        };
+      }
+
+      // ============================================================
+      // 8. BATCH PROCESSING PIPELINE
+      // ============================================================
+      async function runBatchEvaluation(rawCandidates, replaceExisting = true) {
+        if (state.isProcessing || !rawCandidates.length) return;
+        state.isProcessing = true;
+
+        dom.processingState.classList.remove('hidden');
+        dom.processingTitle.textContent = 'Analyzing candidate profiles against rubric...';
+        dom.processingPercent.textContent = '8%';
+        dom.processingBar.style.width = '8%';
+        dom.loadSampleResumesBtn.disabled = true;
+        dom.reEvaluateBtn.disabled = true;
+
+        const jobTitle = dom.jobTitleInput.value.trim() || 'Open Position';
+        const reqText = dom.jobRequirementsInput.value.trim();
+        state.jobTitle = jobTitle;
+        state.jobRequirements = reqText;
+
+        const useExternalApi = state.apiConfig.provider !== 'builtin' && Boolean((state.apiConfig.apiKey || '').trim());
+        const evaluated = [];
+        let fallbackTriggered = false;
+
+        for (let i = 0; i < rawCandidates.length; i++) {
+          const cand = rawCandidates[i];
+          const pct = Math.round(((i + 0.5) / rawCandidates.length) * 90) + 5;
+          dom.processingPercent.textContent = `${pct}%`;
+          dom.processingBar.style.width = `${pct}%`;
+          dom.processingSubtext.textContent = `Evaluating ${cand.name} (${i + 1} of ${rawCandidates.length}) — extracting verbatim resume evidence...`;
+
+          await new Promise(resolve => setTimeout(resolve, useExternalApi ? 100 : 190));
+
+          let result;
+          if (useExternalApi) {
+            try {
+              result = await evaluateCandidateWithCustomApi(cand, jobTitle, reqText);
+            } catch (_) {
+              fallbackTriggered = true;
+              result = evaluateCandidateLocally(cand, jobTitle, reqText);
+            }
+          } else {
+            result = evaluateCandidateLocally(cand, jobTitle, reqText);
+          }
+          evaluated.push(result);
+        }
+
+        dom.processingPercent.textContent = '100%';
+        dom.processingBar.style.width = '100%';
+        dom.processingSubtext.textContent = 'Ranking leaderboard and finalizing tailored interview guides...';
+        await new Promise(resolve => setTimeout(resolve, 220));
+
+        state.candidates = replaceExisting ? evaluated : [...state.candidates, ...evaluated];
+        sortCandidates();
+        persistWorkspace();
+
+        state.isProcessing = false;
+        dom.processingState.classList.add('hidden');
+        dom.loadSampleResumesBtn.disabled = false;
+        dom.reEvaluateBtn.disabled = state.candidates.length === 0;
+
+        renderAll();
+
+        if (fallbackTriggered) {
+          showToast('Custom API call failed; completed screening with Built-In Strict Rubric Engine.', 'info');
+        } else {
+          showToast(`Evaluated ${evaluated.length} candidate${evaluated.length === 1 ? '' : 's'} against "${jobTitle}".`, 'success');
+        }
+      }
+
+      function sortCandidates() {
+        state.candidates.forEach(c => {
+          c.matchScore = computeCompositeScore(c.subScores);
+        });
+        state.candidates.sort((a, b) => b.matchScore - a.matchScore);
+      }
+
+      // ============================================================
+      // 9. UI RENDERING
+      // ============================================================
+      function renderWeightsUI() {
+        const norm = getNormalizedWeights();
+        dom.weightExpVal.textContent = `${norm.exp}%`;
+        dom.weightSkillsVal.textContent = `${norm.skills}%`;
+        dom.weightEduVal.textContent = `${norm.edu}%`;
+        dom.barExp.style.width = `${norm.exp}%`;
+        dom.barSkills.style.width = `${norm.skills}%`;
+        dom.barEdu.style.width = `${norm.edu}%`;
+      }
+
+      function renderEngineStatus() {
+        const cfg = state.apiConfig;
+        const activeExternal = cfg.provider !== 'builtin' && Boolean((cfg.apiKey || '').trim());
+        if (activeExternal) {
+          const pLabel = PROVIDER_DEFAULTS[cfg.provider]?.label || 'Custom API';
+          dom.engineStatusDot.className = 'w-2 h-2 rounded-full bg-indigo-500';
+          dom.engineStatusLabel.textContent = `${pLabel} Active`;
+          dom.sidebarEngineDesc.textContent = `${pLabel} · ${cfg.model || 'Custom Model'}`;
+        } else {
+          dom.engineStatusDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+          dom.engineStatusLabel.textContent = 'Built-In Engine';
+          dom.sidebarEngineDesc.textContent = 'Built-In Strict Rubric (Free)';
+        }
+      }
+
+      function renderAll() {
+        renderWeightsUI();
+        renderEngineStatus();
+        renderKPIs();
+        renderLeaderboard();
+        if (state.activeDrawerCandidateId) {
+          const active = state.candidates.find(c => c.id === state.activeDrawerCandidateId);
+          if (active) populateDrawer(active);
+          else closeDrawer();
+        }
+      }
+
+      function renderKPIs() {
+        const total = state.candidates.length;
+        if (total === 0) {
+          dom.kpiStrip.classList.add('hidden');
+          dom.exportSummaryBtn.disabled = true;
+          dom.reEvaluateBtn.disabled = true;
+          dom.shortlistTabCount.textContent = '0';
+          dom.leaderboardCountBadge.textContent = '0 candidates';
+          return;
+        }
+        const strong = state.candidates.filter(c => c.matchScore >= 80).length;
+        const avg = Math.round(state.candidates.reduce((acc, c) => acc + c.matchScore, 0) / total);
+        const shortlisted = state.candidates.filter(c => c.shortlisted).length;
+
+        dom.kpiStrip.classList.remove('hidden');
+        dom.kpiTotal.textContent = String(total);
+        dom.kpiStrong.textContent = String(strong);
+        dom.kpiAvg.textContent = `${avg}%`;
+        dom.kpiShortlisted.textContent = String(shortlisted);
+        dom.shortlistTabCount.textContent = String(shortlisted);
+        dom.leaderboardCountBadge.textContent = `${total} candidate${total === 1 ? '' : 's'}`;
+        dom.exportSummaryBtn.disabled = false;
+        dom.reEvaluateBtn.disabled = false;
+      }
+
+      function getFilteredCandidates() {
+        const q = state.searchQuery.trim().toLowerCase();
+        return state.candidates
+          .map((c, idx) => ({ candidate: c, rank: idx + 1 }))
+          .filter(({ candidate }) => {
+            if (state.filter === 'strong' && candidate.matchScore < 80) return false;
+            if (state.filter === 'shortlisted' && !candidate.shortlisted) return false;
+            if (q) {
+              const hay = `${candidate.name} ${candidate.role} ${candidate.email} ${candidate.strengths.join(' ')} ${candidate.gaps.join(' ')}`.toLowerCase();
+              if (!hay.includes(q)) return false;
+            }
+            return true;
+          });
+      }
+
+      function renderLeaderboard() {
+        if (state.candidates.length === 0) {
+          dom.emptyState.classList.remove('hidden');
+          dom.noFilterMatchState.classList.add('hidden');
+          dom.tableWrapper.classList.add('hidden');
+          return;
+        }
+        dom.emptyState.classList.add('hidden');
+        const rows = getFilteredCandidates();
+
+        if (rows.length === 0) {
+          dom.noFilterMatchState.classList.remove('hidden');
+          dom.tableWrapper.classList.add('hidden');
+          return;
+        }
+        dom.noFilterMatchState.classList.add('hidden');
+        dom.tableWrapper.classList.remove('hidden');
+
+        dom.leaderboardBody.innerHTML = rows
+          .map(({ candidate, rank }) => {
+            const band = getScoreBand(candidate.matchScore);
+            const rankBadge =
+              rank === 1
+                ? 'bg-indigo-600 text-white'
+                : rank <= 3
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 text-slate-600';
+
+            const strengthsHtml = candidate.strengths
+              .map(
+                s =>
+                  `<li class="flex items-start gap-1.5 text-xs text-slate-700 leading-snug">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span>
+                    <span>${escapeHtml(s)}</span>
+                  </li>`
+              )
+              .join('');
+
+            const gapsHtml = candidate.gaps
+              .map(g => {
+                const isClean = g.toLowerCase().includes('no critical');
+                return `<li class="flex items-start gap-1.5 text-xs ${isClean ? 'text-slate-400 italic' : 'text-slate-600'} leading-snug">
+                  <span class="w-1.5 h-1.5 rounded-full ${isClean ? 'bg-slate-300' : 'bg-rose-400'} mt-1.5 shrink-0"></span>
+                  <span>${escapeHtml(g)}</span>
+                </li>`;
+              })
+              .join('');
+
+            const shortlistBtnClass = candidate.shortlisted
+              ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300';
+
+            return `
+              <tr data-candidate-id="${escapeHtml(candidate.id)}" class="candidate-row hover:bg-indigo-50/35 transition cursor-pointer group">
+                <td class="py-4 pl-5 pr-3 align-top">
+                  <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold tabular-nums ${rankBadge}">#${rank}</span>
+                </td>
+                <td class="py-4 px-3 align-top">
+                  <div class="flex items-start gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center shrink-0 group-hover:bg-indigo-100 group-hover:text-indigo-700 group-hover:border-indigo-200 transition">
+                      ${escapeHtml(getInitials(candidate.name))}
+                    </div>
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <p class="font-semibold text-slate-900 group-hover:text-indigo-700 transition truncate">${escapeHtml(candidate.name)}</p>
+                        ${candidate.shortlisted ? '<i data-lucide="bookmark-check" class="w-3.5 h-3.5 text-indigo-600 shrink-0"></i>' : ''}
+                      </div>
+                      <p class="text-xs text-slate-500 truncate max-w-[200px]">${escapeHtml(candidate.role)}</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-4 px-3 align-top">
+                  <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold tabular-nums ${band.badgeClass}">
+                    <span class="w-1.5 h-1.5 rounded-full ${band.dotClass}"></span>
+                    ${candidate.matchScore}%
+                  </div>
+                  <div class="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden mt-2">
+                    <div class="h-full rounded-full ${band.barClass}" style="width: ${candidate.matchScore}%"></div>
+                  </div>
+                  <p class="text-[11px] text-slate-400 mt-1">${band.label}</p>
+                </td>
+                <td class="py-4 px-3 align-top"><ul class="space-y-1.5">${strengthsHtml}</ul></td>
+                <td class="py-4 px-3 align-top"><ul class="space-y-1.5">${gapsHtml}</ul></td>
+                <td class="py-4 pl-3 pr-5 align-top text-right">
+                  <div class="inline-flex items-center justify-end gap-1.5">
+                    <button type="button" data-action="breakdown" data-id="${escapeHtml(candidate.id)}"
+                      class="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/70 transition whitespace-nowrap">
+                      View Full Breakdown
+                    </button>
+                    <button type="button" data-action="shortlist" data-id="${escapeHtml(candidate.id)}"
+                      class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition whitespace-nowrap ${shortlistBtnClass}">
+                      <i data-lucide="${candidate.shortlisted ? 'check' : 'bookmark'}" class="w-3.5 h-3.5"></i>
+                      ${candidate.shortlisted ? 'Shortlisted' : 'Shortlist'}
+                    </button>
+                    <button type="button" data-action="remove" data-id="${escapeHtml(candidate.id)}" title="Remove candidate"
+                      class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
+                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join('');
+
+        if (window.lucide) window.lucide.createIcons({ nodes: [dom.leaderboardBody] });
+      }
+
+      // ============================================================
+      // 10. CANDIDATE DEEP-DIVE DRAWER
+      // ============================================================
+      function openDrawer(candidateId) {
+        const candidate = state.candidates.find(c => c.id === candidateId);
+        if (!candidate) return;
+        state.activeDrawerCandidateId = candidateId;
+        populateDrawer(candidate);
+        dom.drawerContainer.classList.remove('hidden');
+        requestAnimationFrame(() => {
+          dom.drawerBackdrop.classList.remove('opacity-0');
+          dom.drawerPanel.classList.remove('translate-x-full');
+        });
+      }
+
+      function closeDrawer() {
+        dom.drawerBackdrop.classList.add('opacity-0');
+        dom.drawerPanel.classList.add('translate-x-full');
+        setTimeout(() => {
+          dom.drawerContainer.classList.add('hidden');
+          state.activeDrawerCandidateId = null;
+        }, 230);
+      }
+
+      function populateDrawer(candidate) {
+        const band = getScoreBand(candidate.matchScore);
+        const norm = getNormalizedWeights();
+
+        dom.drawerAvatar.textContent = getInitials(candidate.name);
+        dom.drawerCandidateName.textContent = candidate.name;
+        dom.drawerScoreBadge.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold tabular-nums ${band.badgeClass}`;
+        dom.drawerScoreBadge.textContent = `${candidate.matchScore}% · ${band.label}`;
+        dom.drawerCandidateMeta.textContent = `${candidate.role} · ${candidate.location}`;
+        const contactParts = [candidate.email, candidate.phone].filter(Boolean);
+        dom.drawerContactMeta.textContent = contactParts.join(' · ');
+        dom.drawerContactMeta.classList.toggle('hidden', contactParts.length === 0);
+        dom.drawerEngineTag.textContent = `Evaluated by ${candidate.engineUsed} against "${state.jobTitle}"`;
+
+        dom.drawerWeightExp.textContent = `${norm.exp}% wt`;
+        dom.drawerWeightSkills.textContent = `${norm.skills}% wt`;
+        dom.drawerWeightEdu.textContent = `${norm.edu}% wt`;
+        dom.drawerSubExp.textContent = `${candidate.subScores.experience}%`;
+        dom.drawerSubSkills.textContent = `${candidate.subScores.skills}%`;
+        dom.drawerSubEdu.textContent = `${candidate.subScores.education}%`;
+
+        dom.drawerSummary.textContent = candidate.summary;
+        dom.drawerNotesInput.value = candidate.notes || '';
+        dom.drawerRawResume.textContent = candidate.rawText;
+
+        dom.drawerEvidenceList.innerHTML = candidate.evidence
+          .map(item => {
+            const statusMap = {
+              verified: { badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Verified', border: 'border-l-emerald-500' },
+              partial: { badge: 'bg-amber-50 text-amber-800 border-amber-200', label: 'Partial Match', border: 'border-l-amber-500' },
+              missing: { badge: 'bg-rose-50 text-rose-700 border-rose-200', label: 'Missing / Unverified', border: 'border-l-rose-400' }
+            };
+            const st = statusMap[item.status] || statusMap.partial;
+            const quoteHtml =
+              item.status === 'missing'
+                ? `<p class="text-xs text-slate-500 italic mt-2">${escapeHtml(item.quote)}</p>`
+                : `<blockquote class="mt-2 pl-3 border-l-2 border-indigo-200 text-xs text-slate-700 bg-slate-50 py-1.5 pr-2 rounded-r-md font-medium">“${escapeHtml(item.quote)}”</blockquote>`;
+
+            return `
+              <div class="rounded-xl border border-slate-200 border-l-4 ${st.border} bg-white p-3.5 shadow-2xs">
+                <div class="flex items-start justify-between gap-3">
+                  <p class="text-xs font-semibold text-slate-900 leading-snug">${escapeHtml(item.requirement)}</p>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border shrink-0 ${st.badge}">${st.label}</span>
+                </div>
+                ${quoteHtml}
+              </div>
+            `;
+          })
+          .join('');
+
+        dom.drawerQuestionsList.innerHTML = candidate.questions
+          .map(
+            (q, idx) => `
+              <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                  <span class="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-700">
+                    <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[11px]">${idx + 1}</span>
+                    ${escapeHtml(q.focus)}
+                  </span>
+                  <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-medium">${escapeHtml(q.tag)}</span>
+                </div>
+                <p class="text-sm font-medium text-slate-900 leading-relaxed">${escapeHtml(q.question)}</p>
+                <p class="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-100">
+                  <span class="font-semibold text-slate-700">What to verify:</span> ${escapeHtml(q.listenFor)}
+                </p>
+              </div>
+            `
+          )
+          .join('');
+
+        if (candidate.shortlisted) {
+          dom.drawerShortlistBtn.className =
+            'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 transition';
+          dom.drawerShortlistBtn.innerHTML = '<i data-lucide="bookmark-check" class="w-4 h-4"></i><span>Shortlisted</span>';
+        } else {
+          dom.drawerShortlistBtn.className =
+            'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition';
+          dom.drawerShortlistBtn.innerHTML = '<i data-lucide="bookmark" class="w-4 h-4"></i><span>Shortlist Candidate</span>';
+        }
+
+        if (window.lucide) window.lucide.createIcons({ nodes: [dom.drawerPanel] });
+      }
+
+      function toggleShortlist(candidateId) {
+        const candidate = state.candidates.find(c => c.id === candidateId);
+        if (!candidate) return;
+        candidate.shortlisted = !candidate.shortlisted;
+        persistWorkspace();
+        renderAll();
+        showToast(candidate.shortlisted ? `${candidate.name} added to shortlist.` : `${candidate.name} removed from shortlist.`, 'info');
+      }
+
+      function removeCandidate(candidateId) {
+        const candidate = state.candidates.find(c => c.id === candidateId);
+        if (!candidate) return;
+        state.candidates = state.candidates.filter(c => c.id !== candidateId);
+        if (state.activeDrawerCandidateId === candidateId) closeDrawer();
+        persistWorkspace();
+        renderAll();
+        showToast(`Removed ${candidate.name} from leaderboard.`, 'info');
+      }
+
+      // ============================================================
+      // 11. ONE-PAGE EXECUTIVE SUMMARY & INTERVIEW GUIDE COPY
+      // ============================================================
+      function buildInterviewGuideText(candidate) {
+        return [
+          `TALENTLENS AI — BEHAVIORAL INTERVIEW GUIDE`,
+          `Role: ${state.jobTitle}`,
+          `Candidate: ${candidate.name} (${candidate.role})`,
+          `Overall Match Score: ${candidate.matchScore}% (Experience: ${candidate.subScores.experience}%, Skills: ${candidate.subScores.skills}%, Education: ${candidate.subScores.education}%)`,
+          ``,
+          `ASSESSMENT SUMMARY`,
+          candidate.summary,
+          ``,
+          `TOP VERIFIED STRENGTHS`,
+          ...candidate.strengths.map(s => `- ${s}`),
+          ``,
+          `MISSING SKILLS / RED FLAGS`,
+          ...candidate.gaps.map(g => `- ${g}`),
+          ``,
+          `TAILORED BEHAVIORAL INTERVIEW QUESTIONS`,
+          ...candidate.questions.map(
+            (q, i) => `${i + 1}. [${q.tag} — ${q.focus}]\n   Question: ${q.question}\n   What to verify: ${q.listenFor}`
+          ),
+          ...(candidate.notes ? [``, `RECRUITER NOTES`, candidate.notes] : [])
+        ].join('\n');
+      }
+
+      function getSummaryTarget() {
+        const shortlisted = state.candidates.filter(c => c.shortlisted);
+        return {
+          candidates: shortlisted.length > 0 ? shortlisted : state.candidates,
+          isShortlistOnly: shortlisted.length > 0
+        };
+      }
+
+      function renderSummarySheetHtml(candidates, isShortlistOnly) {
+        const norm = getNormalizedWeights();
+        const avgScore = Math.round(candidates.reduce((sum, c) => sum + c.matchScore, 0) / Math.max(1, candidates.length));
+        const strongCount = candidates.filter(c => c.matchScore >= 80).length;
+        const generatedDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+        const overviewRows = candidates
+          .map(c => {
+            const rank = state.candidates.findIndex(item => item.id === c.id) + 1;
+            const band = getScoreBand(c.matchScore);
+            return `
+              <tr class="border-b border-slate-100 last:border-0">
+                <td class="py-2 pr-3 font-bold text-slate-700 tabular-nums">#${rank}</td>
+                <td class="py-2 px-3">
+                  <div class="font-semibold text-slate-900">${escapeHtml(c.name)}</div>
+                  <div class="text-[11px] text-slate-500">${escapeHtml(c.role)}</div>
+                </td>
+                <td class="py-2 px-3">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${band.badgeClass}">${c.matchScore}%</span>
+                </td>
+                <td class="py-2 px-3 text-xs text-slate-600 tabular-nums">
+                  Exp ${c.subScores.experience}% · Skills ${c.subScores.skills}% · Edu ${c.subScores.education}%
+                </td>
+                <td class="py-2 pl-3 text-right text-xs font-medium ${c.shortlisted ? 'text-indigo-600' : 'text-slate-400'}">
+                  ${c.shortlisted ? 'Shortlisted' : 'Screened'}
+                </td>
+              </tr>
+            `;
+          })
+          .join('');
+
+        const candidateCards = candidates
+          .map(c => {
+            const rank = state.candidates.findIndex(item => item.id === c.id) + 1;
+            const band = getScoreBand(c.matchScore);
+            const verifiedQuotes = c.evidence
+              .filter(e => e.status === 'verified' && e.quote && !e.quote.startsWith('No direct'))
+              .slice(0, 2);
+
+            return `
+              <article class="rounded-xl border border-slate-200 bg-white p-5 space-y-4 break-inside-avoid">
+                <div class="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-slate-900 text-white text-xs font-bold tabular-nums">#${rank}</span>
+                      <h4 class="text-base font-bold text-slate-900">${escapeHtml(c.name)}</h4>
+                      ${c.shortlisted ? '<span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">Shortlisted</span>' : ''}
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">${escapeHtml(c.role)} · ${escapeHtml(c.location)}${c.email ? ' · ' + escapeHtml(c.email) : ''}</p>
+                  </div>
+                  <div class="text-right">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tabular-nums ${band.badgeClass}">${c.matchScore}% · ${band.label}</span>
+                    <p class="text-[11px] text-slate-500 mt-1 tabular-nums">Exp ${c.subScores.experience}% | Skills ${c.subScores.skills}% | Edu ${c.subScores.education}%</p>
+                  </div>
+                </div>
+
+                <p class="text-xs sm:text-sm text-slate-700 leading-relaxed">${escapeHtml(c.summary)}</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="rounded-lg bg-emerald-50/60 border border-emerald-200/70 p-3.5">
+                    <h5 class="text-[11px] font-bold uppercase tracking-wider text-emerald-800 mb-2">Advantages (Verified Strengths)</h5>
+                    <ul class="space-y-1.5">
+                      ${c.strengths
+                        .map(s => `<li class="flex items-start gap-2 text-xs text-slate-800 leading-snug"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span><span>${escapeHtml(s)}</span></li>`)
+                        .join('')}
+                    </ul>
+                  </div>
+
+                  <div class="rounded-lg bg-rose-50/60 border border-rose-200/70 p-3.5">
+                    <h5 class="text-[11px] font-bold uppercase tracking-wider text-rose-800 mb-2">Weaknesses (Missing Skills &amp; Risks)</h5>
+                    <ul class="space-y-1.5">
+                      ${c.gaps
+                        .map(g => `<li class="flex items-start gap-2 text-xs text-slate-800 leading-snug"><span class="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0"></span><span>${escapeHtml(g)}</span></li>`)
+                        .join('')}
+                    </ul>
+                  </div>
+                </div>
+
+                ${
+                  verifiedQuotes.length
+                    ? `<div class="rounded-lg bg-slate-50 border border-slate-200/80 p-3.5">
+                        <h5 class="text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-2">Quoted Resume Evidence</h5>
+                        <div class="space-y-1.5">
+                          ${verifiedQuotes
+                            .map(ev => `<p class="text-xs text-slate-700 leading-snug"><span class="font-semibold text-slate-900">${escapeHtml(summarizeReqLabel(ev.requirement))}:</span> “${escapeHtml(ev.quote)}”</p>`)
+                            .join('')}
+                        </div>
+                      </div>`
+                    : ''
+                }
+
+                <div class="pt-1">
+                  <h5 class="text-[11px] font-bold uppercase tracking-wider text-indigo-700 mb-2">3 Tailored Behavioral Interview Questions</h5>
+                  <ol class="space-y-1.5 list-decimal list-inside text-xs text-slate-700 leading-relaxed">
+                    ${c.questions
+                      .map(q => `<li><span class="font-semibold text-slate-900">[${escapeHtml(q.focus)}]</span> ${escapeHtml(q.question)}</li>`)
+                      .join('')}
+                  </ol>
+                </div>
+
+                ${
+                  c.notes
+                    ? `<div class="rounded-lg bg-amber-50/60 border border-amber-200/70 p-3 text-xs text-slate-700"><span class="font-bold text-amber-900">Recruiter Notes:</span> ${escapeHtml(c.notes)}</div>`
+                    : ''
+                }
+              </article>
+            `;
+          })
+          .join('');
+
+        return `
+          <div class="flex flex-wrap items-start justify-between gap-4 pb-5 border-b border-slate-200">
+            <div>
+              <p class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">TalentLens AI · Executive Screening Summary</p>
+              <h2 class="text-xl sm:text-2xl font-bold text-slate-900 mt-1">${escapeHtml(state.jobTitle)}</h2>
+              <p class="text-xs text-slate-500 mt-1">
+                Generated ${escapeHtml(generatedDate)} · Rubric Weights: Experience ${norm.exp}% · Skills Match ${norm.skills}% · Education ${norm.edu}%
+              </p>
+            </div>
+            <div class="flex items-center gap-3 text-center">
+              <div class="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
+                <div class="text-[11px] text-slate-500">${isShortlistOnly ? 'Shortlisted' : 'Screened'}</div>
+                <div class="text-lg font-bold text-slate-900 tabular-nums">${candidates.length}</div>
+              </div>
+              <div class="px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200">
+                <div class="text-[11px] text-emerald-700">Strong (80%+)</div>
+                <div class="text-lg font-bold text-emerald-700 tabular-nums">${strongCount}</div>
+              </div>
+              <div class="px-3 py-2 rounded-lg bg-indigo-50 border border-indigo-200">
+                <div class="text-[11px] text-indigo-700">Avg Score</div>
+                <div class="text-lg font-bold text-indigo-700 tabular-nums">${avgScore}%</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2.5">At-a-Glance Candidate Ranking</h3>
+            <div class="overflow-x-auto rounded-lg border border-slate-200">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <th class="py-2 pl-3 pr-3">Rank</th>
+                    <th class="py-2 px-3">Candidate</th>
+                    <th class="py-2 px-3">Match</th>
+                    <th class="py-2 px-3">Rubric Sub-Scores</th>
+                    <th class="py-2 pl-3 pr-3 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 bg-white">${overviewRows}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Detailed Candidate Profiles (Advantages, Weaknesses &amp; Interview Guides)</h3>
+            ${candidateCards}
+          </div>
+        `;
+      }
+
+      function buildSummaryPlainText(candidates, isShortlistOnly) {
+        const norm = getNormalizedWeights();
+        const header = [
+          `TALENTLENS AI — ONE-PAGE CANDIDATE SUMMARY`,
+          `Role: ${state.jobTitle}`,
+          `Scope: ${isShortlistOnly ? `Shortlisted Candidates (${candidates.length})` : `All Screened Candidates (${candidates.length})`}`,
+          `Rubric Weights: Experience ${norm.exp}% | Skills Match ${norm.skills}% | Education ${norm.edu}%`,
+          `========================================================================`
+        ];
+
+        const blocks = candidates.map(c => {
+          const rank = state.candidates.findIndex(item => item.id === c.id) + 1;
+          return [
+            ``,
+            `#${rank} ${c.name} — ${c.matchScore}% Match${c.shortlisted ? ' [SHORTLISTED]' : ''}`,
+            `Role & Location: ${c.role} | ${c.location}`,
+            `Sub-Scores: Experience ${c.subScores.experience}% | Skills ${c.subScores.skills}% | Education ${c.subScores.education}%`,
+            `Summary: ${c.summary}`,
+            `Advantages (Verified Strengths):`,
+            ...c.strengths.map(s => `  + ${s}`),
+            `Weaknesses (Missing Skills / Red Flags):`,
+            ...c.gaps.map(g => `  - ${g}`),
+            `Tailored Behavioral Interview Questions:`,
+            ...c.questions.map((q, idx) => `  ${idx + 1}. [${q.focus}] ${q.question}`),
+            ...(c.notes ? [`Recruiter Notes: ${c.notes}`] : []),
+            `------------------------------------------------------------------------`
+          ].join('\n');
+        });
+
+        return [...header, ...blocks].join('\n');
+      }
+
+      function openSummaryModal() {
+        if (!state.candidates.length) return;
+        const { candidates, isShortlistOnly } = getSummaryTarget();
+        dom.summaryScopeBadge.textContent = isShortlistOnly ? `Shortlisted (${candidates.length})` : `All Screened (${candidates.length})`;
+        dom.summarySheet.innerHTML = renderSummarySheetHtml(candidates, isShortlistOnly);
+        dom.summaryModal.classList.remove('hidden');
+        dom.summaryModal.classList.add('flex');
+        if (window.lucide) window.lucide.createIcons({ nodes: [dom.summaryModal] });
+      }
+
+      function closeSummaryModal() {
+        dom.summaryModal.classList.add('hidden');
+        dom.summaryModal.classList.remove('flex');
+      }
+
+      function downloadSummaryHtml() {
+        if (!state.candidates.length) return;
+        const { candidates, isShortlistOnly } = getSummaryTarget();
+        const bodyHtml = renderSummarySheetHtml(candidates, isShortlistOnly);
+        const standalone = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TalentLens AI Summary — ${escapeHtml(state.jobTitle)}</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"><\/script>
+  <style>
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; background: #f8fafc; color: #0f172a; }
+    @media print { body { background: #ffffff; } .sheet { border: none !important; box-shadow: none !important; } }
+  </style>
+</head>
+<body class="p-4 sm:p-8 antialiased">
+  <main class="sheet max-w-4xl mx-auto bg-white rounded-xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+    ${bodyHtml}
+  </main>
+</body>
+</html>`;
+
+        const blob = new Blob([standalone], { type: 'text/html;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const slug = (state.jobTitle || 'candidates').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        link.href = url;
+        link.download = `talentlens_summary_${slug}.html`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        showToast(
+          isShortlistOnly
+            ? `Downloaded one-page summary for ${candidates.length} shortlisted candidate${candidates.length === 1 ? '' : 's'}.`
+            : `Downloaded one-page summary for all ${candidates.length} screened candidates.`,
+          'success'
+        );
+      }
+
+      // ============================================================
+      // 12. CUSTOM API (BYOK) SIDE DRAWER LOGIC
+      // ============================================================
+      function syncApiFormVisibility(provider) {
+        const isBuiltIn = provider === 'builtin';
+        dom.builtinInfoBox.classList.toggle('hidden', !isBuiltIn);
+        dom.externalApiFields.classList.toggle('hidden', isBuiltIn);
+        dom.customEndpointGroup.classList.toggle('hidden', provider !== 'custom');
+        dom.apiTestResult.classList.add('hidden');
+      }
+
+      function openApiDrawer() {
+        dom.apiProviderSelect.value = state.apiConfig.provider || 'builtin';
+        dom.apiKeyInput.value = state.apiConfig.apiKey || '';
+        dom.apiModelInput.value =
+          state.apiConfig.model || PROVIDER_DEFAULTS[state.apiConfig.provider]?.model || '';
+        dom.apiEndpointInput.value =
+          state.apiConfig.endpoint || PROVIDER_DEFAULTS[state.apiConfig.provider]?.endpoint || '';
+        dom.persistKeyCheckbox.checked = state.apiConfig.persist !== false;
+        syncApiFormVisibility(dom.apiProviderSelect.value);
+
+        dom.apiDrawerContainer.classList.remove('hidden');
+        requestAnimationFrame(() => {
+          dom.apiDrawerBackdrop.classList.remove('opacity-0');
+          dom.apiDrawerPanel.classList.remove('translate-x-full');
+        });
+        if (window.lucide) window.lucide.createIcons({ nodes: [dom.apiDrawerPanel] });
+      }
+
+      function closeApiDrawer() {
+        dom.apiDrawerBackdrop.classList.add('opacity-0');
+        dom.apiDrawerPanel.classList.add('translate-x-full');
+        setTimeout(() => {
+          dom.apiDrawerContainer.classList.add('hidden');
+        }, 230);
+      }
+
+      dom.apiProviderSelect.addEventListener('change', () => {
+        const prov = dom.apiProviderSelect.value;
+        dom.apiModelInput.value = PROVIDER_DEFAULTS[prov]?.model || '';
+        if (prov === 'custom' && !dom.apiEndpointInput.value) {
+          dom.apiEndpointInput.value = PROVIDER_DEFAULTS.custom.endpoint;
+        }
+        syncApiFormVisibility(prov);
+      });
+
+      dom.toggleKeyVisBtn.addEventListener('click', () => {
+        dom.apiKeyInput.type = dom.apiKeyInput.type === 'password' ? 'text' : 'password';
+      });
+
+      dom.testApiBtn.addEventListener('click', async () => {
+        const tempCfg = {
+          provider: dom.apiProviderSelect.value,
+          apiKey: dom.apiKeyInput.value.trim(),
+          model: dom.apiModelInput.value.trim(),
+          endpoint: dom.apiEndpointInput.value.trim()
+        };
+        if (!tempCfg.apiKey) {
+          dom.apiTestResult.className = 'rounded-lg px-3 py-2 text-xs bg-rose-50 text-rose-700 border border-rose-200';
+          dom.apiTestResult.textContent = 'Please enter an API key first.';
+          return;
+        }
+        dom.testApiBtn.disabled = true;
+        dom.apiTestResult.className = 'rounded-lg px-3 py-2 text-xs bg-slate-100 text-slate-600 border border-slate-200';
+        dom.apiTestResult.textContent = 'Testing connection...';
+        const t0 = performance.now();
+        try {
+          await callExternalProvider('Reply with valid JSON: {"ok": true}', tempCfg);
+          const ms = Math.round(performance.now() - t0);
+          dom.apiTestResult.className = 'rounded-lg px-3 py-2 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200';
+          dom.apiTestResult.textContent = `Connected successfully in ${ms} ms! Ready to screen resumes.`;
+        } catch (err) {
+          dom.apiTestResult.className = 'rounded-lg px-3 py-2 text-xs bg-rose-50 text-rose-700 border border-rose-200';
+          dom.apiTestResult.textContent = `Connection failed: ${err.message}. Check your key, model ID, or endpoint URL.`;
+        } finally {
+          dom.testApiBtn.disabled = false;
+        }
+      });
+
+      dom.saveApiKeyBtn.addEventListener('click', () => {
+        const provider = dom.apiProviderSelect.value;
+        const apiKey = dom.apiKeyInput.value.trim();
+        if (provider !== 'builtin' && !apiKey) {
+          showToast('Enter an API key or switch back to Built-In Engine.', 'error');
+          return;
+        }
+        state.apiConfig = {
+          provider,
+          apiKey: provider === 'builtin' ? '' : apiKey,
+          model: dom.apiModelInput.value.trim() || PROVIDER_DEFAULTS[provider]?.model || '',
+          endpoint: dom.apiEndpointInput.value.trim() || PROVIDER_DEFAULTS[provider]?.endpoint || '',
+          persist: dom.persistKeyCheckbox.checked
+        };
+        persistApiConfig();
+        renderEngineStatus();
+        closeApiDrawer();
+        showToast(
+          provider === 'builtin'
+            ? 'Switched to Built-In Strict Rubric Engine.'
+            : `Saved ${PROVIDER_DEFAULTS[provider]?.label || 'Custom API'} configuration.`,
+          'success'
+        );
+      });
+
+      dom.clearApiKeyBtn.addEventListener('click', () => {
+        state.apiConfig = { provider: 'builtin', apiKey: '', model: '', endpoint: '', persist: true };
+        persistApiConfig();
+        renderEngineStatus();
+        closeApiDrawer();
+        showToast('Reset to Built-In Strict Rubric Engine.', 'info');
+      });
+
+      // ============================================================
+      // 13. EVENT LISTENERS & INITIALIZATION
+      // ============================================================
+      function loadSampleJob(index, announce = false) {
+        const job = SAMPLE_JOBS[index % SAMPLE_JOBS.length];
+        state.sampleJobIndex = index % SAMPLE_JOBS.length;
+        state.jobTitle = job.title;
+        state.jobRequirements = job.requirements;
+        state.weights = { ...job.weights };
+
+        dom.jobTitleInput.value = job.title;
+        dom.jobRequirementsInput.value = job.requirements;
+        dom.weightExp.value = job.weights.exp;
+        dom.weightSkills.value = job.weights.skills;
+        dom.weightEdu.value = job.weights.edu;
+        dom.sampleJobIndicator.textContent = `${state.sampleJobIndex + 1} of ${SAMPLE_JOBS.length} · ${job.label}`;
+
+        renderWeightsUI();
+        if (announce) {
+          showToast(`Loaded sample job: "${job.title}". Click "Try with 5 Sample Resumes" or upload resumes.`, 'info');
+        }
+      }
+
+      dom.loadSampleJobBtn.addEventListener('click', () => {
+        loadSampleJob((state.sampleJobIndex + 1) % SAMPLE_JOBS.length, true);
+      });
+
+      function onWeightSliderInput() {
+        state.weights.exp = Number(dom.weightExp.value);
+        state.weights.skills = Number(dom.weightSkills.value);
+        state.weights.edu = Number(dom.weightEdu.value);
+        if (state.candidates.length > 0) {
+          sortCandidates();
+          persistWorkspace();
+        }
+        renderAll();
+      }
+
+      dom.weightExp.addEventListener('input', onWeightSliderInput);
+      dom.weightSkills.addEventListener('input', onWeightSliderInput);
+      dom.weightEdu.addEventListener('input', onWeightSliderInput);
+
+      dom.reEvaluateBtn.addEventListener('click', () => {
+        if (!state.candidates.length) return;
+        const inputs = state.candidates.map(c => ({
+          id: c.id,
+          name: c.name,
+          role: c.role,
+          location: c.location,
+          email: c.email,
+          phone: c.phone,
+          text: c.rawText,
+          notes: c.notes,
+          shortlisted: c.shortlisted
+        }));
+        runBatchEvaluation(inputs, true);
+      });
+
+      function handleSampleResumesClick() {
+        const activeJob = SAMPLE_JOBS[state.sampleJobIndex];
+        const sampleInputs = activeJob.sampleResumes.map((r, idx) => ({
+          id: `sample_${activeJob.id}_${idx}`,
+          name: r.name,
+          role: r.role,
+          location: r.location,
+          email: r.email || '',
+          phone: '',
+          text: r.text
+        }));
+        runBatchEvaluation(sampleInputs, true);
+      }
+
+      dom.loadSampleResumesBtn.addEventListener('click', handleSampleResumesClick);
+      dom.emptyStateSampleBtn.addEventListener('click', handleSampleResumesClick);
+
+      // Paste Resume Text Panel
+      dom.togglePasteBtn.addEventListener('click', () => {
+        dom.pasteResumePanel.classList.toggle('hidden');
+        if (!dom.pasteResumePanel.classList.contains('hidden')) dom.pasteResumeText.focus();
+      });
+      dom.closePasteBtn.addEventListener('click', () => dom.pasteResumePanel.classList.add('hidden'));
+      dom.screenPastedBtn.addEventListener('click', async () => {
+        const raw = dom.pasteResumeText.value.trim();
+        if (raw.length < 25) {
+          showToast('Please paste a complete resume (at least a few lines of text).', 'error');
+          return;
+        }
+        const meta = parseCandidateMetadata(
+          raw,
+          dom.pasteCandidateName.value.trim(),
+          dom.pasteCandidateRole.value.trim()
+        );
+        dom.pasteResumeText.value = '';
+        dom.pasteCandidateName.value = '';
+        dom.pasteCandidateRole.value = '';
+        dom.pasteResumePanel.classList.add('hidden');
+        await runBatchEvaluation(
+          [{ id: 'paste_' + Math.random().toString(36).slice(2, 10), ...meta, text: raw }],
+          false
+        );
+      });
+
+      // File Upload (PDF, DOCX, TXT)
+      async function handleUploadedFiles(fileList) {
+        const files = Array.from(fileList || []).filter(
+          f => /\.(pdf|docx|txt)$/i.test(f.name) || f.type === 'application/pdf' || f.type === 'text/plain' || f.type.includes('wordprocessingml')
+        );
+        if (!files.length) {
+          showToast('Please upload .PDF, .DOCX, or .TXT resume files.', 'error');
+          return;
+        }
+        const parsedCandidates = [];
+        for (const file of files) {
+          const text = await extractTextFromFile(file);
+          const cleanFileName = file.name.replace(/\.(pdf|docx|txt)$/i, '').replace(/[_-]+/g, ' ').trim();
+          const meta = parseCandidateMetadata(text, null, null);
+          parsedCandidates.push({
+            id: 'upload_' + Math.random().toString(36).slice(2, 10),
+            name: meta.name !== 'Uploaded Candidate' ? meta.name : cleanFileName || 'Uploaded Candidate',
+            role: meta.role,
+            location: meta.location,
+            email: meta.email,
+            phone: meta.phone,
+            text
+          });
+        }
+        dom.fileInput.value = '';
+        await runBatchEvaluation(parsedCandidates, false);
+      }
+
+      dom.dropZone.addEventListener('click', () => dom.fileInput.click());
+      dom.dropZone.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          dom.fileInput.click();
+        }
+      });
+      dom.fileInput.addEventListener('change', e => handleUploadedFiles(e.target.files));
+      dom.dropZone.addEventListener('dragover', e => {
+        e.preventDefault();
+        dom.dropZone.classList.add('dropzone-active');
+      });
+      dom.dropZone.addEventListener('dragleave', () => dom.dropZone.classList.remove('dropzone-active'));
+      dom.dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dom.dropZone.classList.remove('dropzone-active');
+        handleUploadedFiles(e.dataTransfer.files);
+      });
+
+      // Leaderboard Actions
+      dom.leaderboardBody.addEventListener('click', e => {
+        const btn = e.target.closest('button[data-action]');
+        if (btn) {
+          e.stopPropagation();
+          const { action, id } = btn.dataset;
+          if (action === 'shortlist') toggleShortlist(id);
+          if (action === 'breakdown') openDrawer(id);
+          if (action === 'remove') removeCandidate(id);
+          return;
+        }
+        const row = e.target.closest('tr[data-candidate-id]');
+        if (row) openDrawer(row.dataset.candidateId);
+      });
+
+      // Filters & Search
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.filter = btn.dataset.filter;
+          document.querySelectorAll('.filter-btn').forEach(b => {
+            const active = b.dataset.filter === state.filter;
+            b.className = active
+              ? 'filter-btn px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-slate-900 shadow-xs transition'
+              : 'filter-btn px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition';
+          });
+          renderLeaderboard();
+        });
+      });
+
+      dom.candidateSearchInput.addEventListener('input', e => {
+        state.searchQuery = e.target.value;
+        renderLeaderboard();
+      });
+
+      dom.clearFiltersBtn.addEventListener('click', () => {
+        state.filter = 'all';
+        state.searchQuery = '';
+        dom.candidateSearchInput.value = '';
+        document.querySelectorAll('.filter-btn').forEach(b => {
+          const active = b.dataset.filter === 'all';
+          b.className = active
+            ? 'filter-btn px-2.5 py-1 rounded-md text-xs font-semibold bg-white text-slate-900 shadow-xs transition'
+            : 'filter-btn px-2.5 py-1 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition';
+        });
+        renderLeaderboard();
+      });
+
+      // Summary Modal Controls
+      dom.exportSummaryBtn.addEventListener('click', openSummaryModal);
+      dom.closeSummaryModalBtn.addEventListener('click', closeSummaryModal);
+      dom.summaryModal.addEventListener('click', e => {
+        if (e.target === dom.summaryModal) closeSummaryModal();
+      });
+      dom.downloadSummaryHtmlBtn.addEventListener('click', downloadSummaryHtml);
+      dom.copySummaryTextBtn.addEventListener('click', () => {
+        const { candidates, isShortlistOnly } = getSummaryTarget();
+        copyToClipboard(buildSummaryPlainText(candidates, isShortlistOnly)).then(() => {
+          showToast('Clean one-page summary copied to clipboard.', 'success');
+        });
+      });
+      dom.printSummaryBtn.addEventListener('click', () => window.print());
+
+      // Deep-Dive Drawer Controls
+      dom.closeDrawerBtn.addEventListener('click', closeDrawer);
+      dom.drawerBackdrop.addEventListener('click', closeDrawer);
+      dom.drawerShortlistBtn.addEventListener('click', () => {
+        if (state.activeDrawerCandidateId) toggleShortlist(state.activeDrawerCandidateId);
+      });
+      dom.copyGuideBtn.addEventListener('click', () => {
+        const cand = state.candidates.find(c => c.id === state.activeDrawerCandidateId);
+        if (!cand) return;
+        copyToClipboard(buildInterviewGuideText(cand)).then(() => {
+          showToast(`Interview guide for ${cand.name} copied to clipboard.`, 'success');
+        });
+      });
+      dom.drawerNotesInput.addEventListener('input', e => {
+        const cand = state.candidates.find(c => c.id === state.activeDrawerCandidateId);
+        if (!cand) return;
+        cand.notes = e.target.value;
+        persistWorkspace();
+      });
+
+      // Custom API Drawer Controls
+      dom.apiConfigBtn.addEventListener('click', openApiDrawer);
+      dom.sidebarApiBtn.addEventListener('click', openApiDrawer);
+      dom.closeApiModalBtn.addEventListener('click', closeApiDrawer);
+      dom.apiDrawerBackdrop.addEventListener('click', closeApiDrawer);
+
+      // Escape Key
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+          if (!dom.drawerContainer.classList.contains('hidden')) closeDrawer();
+          if (!dom.summaryModal.classList.contains('hidden')) closeSummaryModal();
+          if (!dom.apiDrawerContainer.classList.contains('hidden')) closeApiDrawer();
+        }
+      });
+
+      // Reset Workspace
+      dom.resetDemoBtn.addEventListener('click', () => {
+        state.candidates = [];
+        state.filter = 'all';
+        state.searchQuery = '';
+        dom.candidateSearchInput.value = '';
+        try { localStorage.removeItem(STORAGE_KEY_STATE); } catch (_) {}
+        if (state.activeDrawerCandidateId) closeDrawer();
+        loadSampleJob(0, false);
+        renderAll();
+        showToast('Workspace cleared and reset to Senior B2B Sales Executive.', 'info');
+      });
+
+      // Bootstrap
+      loadSampleJob(0, false);
+      loadSavedState();
+      dom.jobTitleInput.value = state.jobTitle;
+      dom.jobRequirementsInput.value = state.jobRequirements;
+      dom.weightExp.value = state.weights.exp;
+      dom.weightSkills.value = state.weights.skills;
+      dom.weightEdu.value = state.weights.edu;
+      renderAll();
+      if (window.lucide) window.lucide.createIcons();
+    })();
+  </script>
+</body>
+</html>
